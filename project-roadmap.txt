@@ -1,7 +1,7 @@
-- activate Google Auth, oneTap prijava
-- activate AppCheck
-- test PWA install and run
+- oneTap prijava Google Auth
 ? testiranje online igre, firestore baza, brisanje računa - Privacy Policy
+- activate AppCheck for firestore and auth
+- test PWA install and test
 - review games rules
 - review security, vulnerabilities and firebase rules
 

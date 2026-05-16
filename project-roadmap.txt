@@ -1,7 +1,7 @@
 - oneTap prijava Google Auth
 ? testiranje online igre, firestore baza, brisanje računa - Privacy Policy
-- review games rules
 - review security, vulnerabilities and firebase rules protection
+- review games rules
 
 Ver. 1.0.0 (1)
 - change production flags: firebase.js, vite.config.js

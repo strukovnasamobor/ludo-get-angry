@@ -33,3 +33,8 @@ export const db = initializeFirestore(app, {
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// OAuth 2.0 Web Client ID for Google One Tap. Find it in Google Cloud Console
+// > APIs & Services > Credentials > "Web client (auto created by Google Service)".
+// This value is public (protected by authorized JavaScript origins on the client).
+export const GOOGLE_CLIENT_ID = '1080158427010-REPLACE_WITH_REAL_CLIENT_ID.apps.googleusercontent.com';

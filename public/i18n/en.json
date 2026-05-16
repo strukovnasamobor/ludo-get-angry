@@ -1,0 +1,141 @@
+{
+  "appName": "Ludo Get Angry",
+
+  "navMenu": "Menu",
+  "navRules": "Rules",
+  "navSettings": "Settings",
+  "navBack": "Back",
+
+  "menuPlay": "Play",
+  "menuMultiplayer": "Online",
+  "menuRules": "Game Rules",
+  "menuSettings": "Settings",
+
+  "setupTitle": "New Game",
+  "setupPlayers": "Number of Players",
+  "setupPlayerName": "Player",
+  "setupColorPick": "Choose Color",
+  "setupStart": "Start Game",
+  "setupBack": "Back",
+  "setupMinPlayers": "Minimum 2 players required",
+
+  "colorRed": "Red",
+  "colorYellow": "Yellow",
+  "colorBlue": "Blue",
+  "colorGreen": "Green",
+  "colorCyan": "Cyan",
+  "colorPurple": "Purple",
+  "colorMagenta": "Magenta",
+  "colorOrange": "Orange",
+
+  "gameTurn": "Current Turn",
+  "gameRoll": "Roll Dice",
+  "gameRollsLeft": "Rolls remaining",
+  "gameNoMoves": "No valid moves",
+  "gameChooseExit": "Choose exit",
+  "gameOuterRing": "Outer ring (longer route)",
+  "gameInnerRing": "Inner ring (shorter route)",
+  "gamePlaceSpecial": "Place special square",
+  "gameSkip": "Skip placement",
+  "gameWin": "Winner!",
+  "gameWinMsg": "has won the game!",
+  "gamePlayAgain": "Play Again",
+  "gameMainMenu": "Main Menu",
+
+  "gamePhaseMoving": "move",
+  "gamePhasePlacing": "place",
+  "gamePhaseDuel": "duel!",
+
+  "duelAttacker": "Attacker",
+  "duelDefender": "Defender",
+
+  "initialRollTitle": "Who goes first?",
+  "initialRollTie": "Tie — same players roll again!",
+  "initialRollStarts": "starts!",
+  "initialRollBtn": "roll!",
+  "initialRollReroll": "Roll again",
+  "waitingForHost": "Waiting for host…",
+
+  "ok": "OK",
+  "duelVs": "vs",
+
+  "menuFooter": "2 - 8 players",
+
+  "zamjenaNoFigs": "No pieces available to swap.",
+  "zamjenaFig": "Piece",
+  "zamjenaSkip": "Skip",
+  "zamjenaOwnField": "This is your own SWAP field — no effect.",
+
+  "mostCannotPlace": "BRIDGE not possible — no free parallel square",
+  "mostCannotField": "BRIDGE not possible on this square",
+
+  "pickupChoiceTitle": "Pick up which field?",
+  "pickupSpecial": "Special field",
+  "pickupBridge": "Bridge",
+
+  "duelTitle": "Duel for the square!",
+  "duelWinner": "stays on the square",
+  "duelLoser": "goes home",
+  "duelRoll": "Roll for the duel",
+
+  "specialMost": "BRIDGE",
+  "specialKocka": "DICE",
+  "specialRewind": "REWIND",
+  "specialBomba": "BOMB",
+  "specialStop": "STOP",
+  "specialZamjena": "SWAP",
+
+  "specialMostQ": "Stay on the square or cross the bridge?",
+  "specialMostStay": "Stay",
+  "specialMostCross": "Cross bridge",
+
+  "specialZamjenaTitle": "Swap piece",
+  "specialZamjenaRoll": "Roll dice to choose color",
+
+  "specialBombaMsg": "Boom! Your piece went home.",
+  "specialStopMsg": "Stop! Piece can only move by 1.",
+  "specialRewindMsg": "Rewind! Next move goes backward.",
+  "specialKockaMsg": "Dice! Roll two dice.",
+
+  "rulesTitle": "Game Rules",
+
+  "settingsTitle": "Settings",
+  "settingsTheme": "Theme",
+  "settingsThemeDark": "Dark",
+  "settingsThemeLight": "Light",
+  "settingsLang": "Language",
+  "settingsSaved": "Saved",
+  "settingsLegal": "Legal",
+  "settingsPrivacy": "Privacy Policy",
+  "settingsTerms": "Terms & Conditions",
+
+  "lobbyCreate": "Create Room",
+  "lobbyCreateBtn": "Create Room",
+  "lobbyJoin": "Join Room",
+  "lobbyJoinBtn": "Join",
+  "lobbyOr": "or",
+  "lobbyCodePlaceholder": "Enter code",
+  "lobbyRoomCode": "Room Code",
+  "lobbyShareCode": "Share this code with friends",
+  "lobbyPlayers": "Players",
+  "lobbyYou": "you",
+  "lobbyWaitingPlayers": "Waiting for at least 2 players…",
+  "lobbyWaitingHost": "Waiting for host to start…",
+  "lobbySignInPrompt": "Sign in to play online",
+  "lobbySignInGoogle": "Sign in with Google",
+  "lobbySignOut": "Sign out",
+  "lobbyCreateError": "Failed to create room. Check your connection.",
+  "lobbyJoinError": "Failed to join. Try again.",
+
+  "lobbyLeaveTitle": "Leave room?",
+  "lobbyLeaveMsg": "Are you sure you want to leave this room?",
+  "lobbyLeaveYes": "Leave",
+  "lobbyLeaveNo": "Stay",
+
+  "exitConfirmTitle": "Exit game?",
+  "exitConfirmMsg": "Are you sure you want to quit the current game?",
+  "exitConfirmYes": "Exit",
+  "exitConfirmNo": "Keep playing",
+
+  "onlineNotYourTurn": "Wait for your turn"
+}

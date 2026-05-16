@@ -1,0 +1,141 @@
+{
+  "appName": "Čovječe ljuti se",
+
+  "navMenu": "Izbornik",
+  "navRules": "Pravila",
+  "navSettings": "Postavke",
+  "navBack": "Natrag",
+
+  "menuPlay": "Igraj",
+  "menuMultiplayer": "Online",
+  "menuRules": "Pravila igre",
+  "menuSettings": "Postavke",
+
+  "setupTitle": "Nova igra",
+  "setupPlayers": "Broj igrača",
+  "setupPlayerName": "Igrač",
+  "setupColorPick": "Odaberi boju",
+  "setupStart": "Započni igru",
+  "setupBack": "Natrag",
+  "setupMinPlayers": "Minimalno 2 igrača",
+
+  "colorRed": "Crvena",
+  "colorYellow": "Žuta",
+  "colorBlue": "Plava",
+  "colorGreen": "Zelena",
+  "colorCyan": "Tirkizna",
+  "colorPurple": "Ljubičasta",
+  "colorMagenta": "Ružičasta",
+  "colorOrange": "Narančasta",
+
+  "gameTurn": "Na potezu",
+  "gameRoll": "Baci kocku",
+  "gameRollsLeft": "Bacanja preostalo",
+  "gameNoMoves": "Nema mogućih poteza",
+  "gameChooseExit": "Odaberi izlaz",
+  "gameOuterRing": "Vanjski prsten (dulja ruta)",
+  "gameInnerRing": "Unutarnji prsten (kraća ruta)",
+  "gamePlaceSpecial": "Postavi posebno polje",
+  "gameSkip": "Preskoči postavljanje",
+  "gameWin": "Pobijedio!",
+  "gameWinMsg": "je pobijedio igru!",
+  "gamePlayAgain": "Igraj ponovo",
+  "gameMainMenu": "Glavni izbornik",
+
+  "gamePhaseMoving": "potez",
+  "gamePhasePlacing": "postavi",
+  "gamePhaseDuel": "dvoboj!",
+
+  "duelAttacker": "Napadač",
+  "duelDefender": "Branič",
+
+  "initialRollTitle": "Tko ide prvi?",
+  "initialRollTie": "Izjednačeno — isti igrači bacaju opet!",
+  "initialRollStarts": "počinje!",
+  "initialRollBtn": "baci!",
+  "initialRollReroll": "Baci opet",
+  "waitingForHost": "Čekanje na hosta…",
+
+  "ok": "OK",
+  "duelVs": "vs",
+
+  "menuFooter": "2 – 8 igrača",
+
+  "zamjenaNoFigs": "Nema slobodnih figurica za zamjenu.",
+  "zamjenaFig": "Figurica",
+  "zamjenaSkip": "Preskoči",
+  "zamjenaOwnField": "Ovo je tvoje vlastito polje ZAMJENA — nema efekta.",
+
+  "mostCannotPlace": "MOST nije moguć — nema slobodnog paralelnog polja",
+  "mostCannotField": "MOST nije moguć na ovom polju",
+
+  "pickupChoiceTitle": "Koje polje pokupiti?",
+  "pickupSpecial": "Specijalno polje",
+  "pickupBridge": "Most",
+
+  "duelTitle": "Dvoboj za polje!",
+  "duelWinner": "ostaje na polju",
+  "duelLoser": "odlazi kući",
+  "duelRoll": "Baci kocku za dvoboj",
+
+  "specialMost": "MOST",
+  "specialKocka": "KOCKA",
+  "specialRewind": "REWIND",
+  "specialBomba": "BOMBA",
+  "specialStop": "STOP",
+  "specialZamjena": "ZAMJENA",
+
+  "specialMostQ": "Ostani na polju ili prijeđi most?",
+  "specialMostStay": "Ostani",
+  "specialMostCross": "Prijeđi most",
+
+  "specialZamjenaTitle": "Zamjena figurice",
+  "specialZamjenaRoll": "Baci kocku za odabir boje",
+
+  "specialBombaMsg": "Bum! Tvoja figurica je otišla kući.",
+  "specialStopMsg": "Stop! Figurica se može kretati samo za 1.",
+  "specialRewindMsg": "Rewind! Sljedeći potez ide unazad.",
+  "specialKockaMsg": "Kocka! Baci dvije kocke.",
+
+  "rulesTitle": "Pravila igre",
+
+  "settingsTitle": "Postavke",
+  "settingsTheme": "Tema",
+  "settingsThemeDark": "Tamna",
+  "settingsThemeLight": "Svijetla",
+  "settingsLang": "Jezik",
+  "settingsSaved": "Spremljeno",
+  "settingsLegal": "Pravne informacije",
+  "settingsPrivacy": "Pravila privatnosti",
+  "settingsTerms": "Uvjeti korištenja",
+
+  "lobbyCreate": "Stvori sobu",
+  "lobbyCreateBtn": "Stvori sobu",
+  "lobbyJoin": "Pridruži se sobi",
+  "lobbyJoinBtn": "Pridruži se",
+  "lobbyOr": "ili",
+  "lobbyCodePlaceholder": "Unesi kod",
+  "lobbyRoomCode": "Kod sobe",
+  "lobbyShareCode": "Podijeli ovaj kod s prijateljima",
+  "lobbyPlayers": "Igrači",
+  "lobbyYou": "ti",
+  "lobbyWaitingPlayers": "Čekanje na najmanje 2 igrača…",
+  "lobbyWaitingHost": "Čekanje da domaćin pokrene igru…",
+  "lobbySignInPrompt": "Prijavi se za igranje online",
+  "lobbySignInGoogle": "Prijavi se s Googleom",
+  "lobbySignOut": "Odjava",
+  "lobbyCreateError": "Greška pri stvaranju sobe. Provjeri vezu.",
+  "lobbyJoinError": "Greška pri pridruživanju. Pokušaj ponovo.",
+
+  "lobbyLeaveTitle": "Napusti sobu?",
+  "lobbyLeaveMsg": "Jesi li siguran da želiš napustiti sobu?",
+  "lobbyLeaveYes": "Napusti",
+  "lobbyLeaveNo": "Ostani",
+
+  "exitConfirmTitle": "Izlaz iz igre?",
+  "exitConfirmMsg": "Jesi li siguran da želiš napustiti trenutnu igru?",
+  "exitConfirmYes": "Izlaz",
+  "exitConfirmNo": "Nastavi igru",
+
+  "onlineNotYourTurn": "Čekaj na svoj potez"
+}

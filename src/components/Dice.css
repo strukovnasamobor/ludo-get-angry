@@ -1,0 +1,59 @@
+.dice-container {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+
+.dice-row {
+  display: flex;
+  gap: var(--sp-sm);
+}
+
+.dice-wrapper {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.dice-wrapper--rolling {
+  animation: spin 0.6s ease-in-out;
+}
+
+.die-face {
+  background: #fff;
+  border-radius: 8px;
+  border: 2px solid #333;
+  position: relative;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+}
+
+.die-face--empty {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+}
+
+.die-pip {
+  position: absolute;
+  width: 22%;
+  height: 22%;
+  background: #222;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.dice-roll-btn {
+  padding: 5px var(--sp-md);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.dice-roll-btn--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  0%   { transform: rotateY(0deg) rotateX(0deg); }
+  25%  { transform: rotateY(180deg) rotateX(90deg); }
+  75%  { transform: rotateY(270deg) rotateX(180deg); }
+  100% { transform: rotateY(360deg) rotateX(360deg); }
+}

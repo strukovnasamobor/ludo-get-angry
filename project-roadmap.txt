@@ -1,0 +1,14 @@
+- add web link and header at index
+- privacy_policy adn terms_and_conditions
+- test PWA install and run
+- activate Google Auth
+- activate AppCheck
+- review games rules
+- review security, vulnerabilities and firebase rules
+
+Ver. 1.0.0 (1)
+- publish to public GitHub i dodati @JanJagustovic
+- change production flags: firebase.js, vite.config.js
+- deploy and make TWA with PWA Web Builder
+- Google Play Store new edition
+- change assetlinks.json

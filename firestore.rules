@@ -2,14 +2,137 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAllowedUser() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.lower().matches('.*@gmail[.]com');
+    }
+
     match /rooms/{roomId} {
-      allow read: if request.auth != null;
 
-      allow create: if request.auth != null
-        && request.resource.data.hostUid == request.auth.uid;
+      function existing()    { return resource.data; }
+      function incoming()    { return request.resource.data; }
+      function uid()         { return request.auth.uid; }
+      function isHost()      { return existing().hostUid == uid(); }
+      function isMember()    { return uid() in existing().playerUids; }
 
-      allow update: if request.auth != null;
+      function createShapeOk() {
+        return incoming().keys().hasOnly(
+          ['code', 'hostUid', 'status', 'players', 'playerUids',
+           'gameState', 'createdAt', 'updatedAt']
+        )
+          && incoming().code is string
+          && incoming().code.matches('^[A-Z0-9]{6}$')
+          && incoming().hostUid == uid()
+          && incoming().status == 'waiting'
+          && incoming().players is list
+          && incoming().players.size() == 1
+          && incoming().players[0].uid == uid()
+          && incoming().playerUids is list
+          && incoming().playerUids.size() == 1
+          && incoming().playerUids[0] == uid()
+          && incoming().gameState == null;
+      }
 
+      function sizeOk() {
+        return incoming().players is list
+          && incoming().playerUids is list
+          && incoming().players.size() <= 4
+          && incoming().playerUids.size() == incoming().players.size();
+      }
+
+      function immutableFieldsUnchanged() {
+        return incoming().code == existing().code
+          && incoming().createdAt == existing().createdAt;
+      }
+
+      // ---- update transitions ----
+
+      // Join while waiting: adds own entry, no other player/game changes.
+      function isJoin() {
+        return existing().status == 'waiting'
+          && incoming().status == 'waiting'
+          && incoming().hostUid == existing().hostUid
+          && incoming().gameState == existing().gameState
+          && !isMember()
+          && (uid() in incoming().playerUids)
+          && incoming().playerUids.size() == existing().playerUids.size() + 1
+          && incoming().players.size() == existing().players.size() + 1;
+      }
+
+      // Leave or stale-removal: list shrinks; host may transfer if host left.
+      function isLeaveOrRemoval() {
+        return incoming().players.size() < existing().players.size()
+          && incoming().playerUids.size() < existing().playerUids.size()
+          && incoming().gameState == existing().gameState
+          && incoming().status == existing().status
+          && (
+            // hostUid unchanged and host is still in the room
+            (incoming().hostUid == existing().hostUid
+              && incoming().hostUid in incoming().playerUids)
+            // host left → crown goes to the new first player
+            || (incoming().players.size() > 0
+              && incoming().hostUid == incoming().players[0].uid)
+            // room emptied
+            || incoming().players.size() == 0
+          );
+      }
+
+      // Self-edit of own name/color. Members can shuffle name/color on the
+      // players list; uids are pinned via playerUids so no impersonation.
+      function isSelfEdit() {
+        return incoming().status == existing().status
+          && incoming().hostUid == existing().hostUid
+          && incoming().gameState == existing().gameState
+          && incoming().players.size() == existing().players.size()
+          && incoming().playerUids == existing().playerUids
+          && isMember();
+      }
+
+      // Host transitions waiting → active.
+      function isStartGame() {
+        return isHost()
+          && existing().status == 'waiting'
+          && incoming().status == 'active'
+          && incoming().hostUid == existing().hostUid
+          && incoming().players == existing().players
+          && incoming().playerUids == existing().playerUids;
+      }
+
+      // Presence heartbeat — touches the `presence` map only.
+      function isPresenceWrite() {
+        return incoming().status == existing().status
+          && incoming().hostUid == existing().hostUid
+          && incoming().players == existing().players
+          && incoming().playerUids == existing().playerUids
+          && incoming().gameState == existing().gameState
+          && isMember();
+      }
+
+      // Game-state write during an active game by a member.
+      function isGameStateWrite() {
+        return existing().status == 'active'
+          && incoming().status == 'active'
+          && incoming().hostUid == existing().hostUid
+          && incoming().players == existing().players
+          && incoming().playerUids == existing().playerUids
+          && isMember();
+      }
+
+      allow read:   if isAllowedUser();
+      allow create: if isAllowedUser() && createShapeOk();
+      allow update: if isAllowedUser()
+        && sizeOk()
+        && immutableFieldsUnchanged()
+        && (
+          isJoin()
+          || isLeaveOrRemoval()
+          || isSelfEdit()
+          || isStartGame()
+          || isPresenceWrite()
+          || isGameStateWrite()
+        );
       allow delete: if false;
     }
   }

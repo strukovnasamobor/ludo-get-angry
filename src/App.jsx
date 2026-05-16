@@ -10,6 +10,7 @@ import Settings from './pages/Settings';
 import Lobby from './pages/Lobby';
 import LobbyRoom from './pages/LobbyRoom';
 import OnlineGameBoard from './pages/OnlineGameBoard';
+import RequireAuth from './components/RequireAuth';
 
 export default function App() {
   return (
@@ -24,8 +25,8 @@ export default function App() {
               <Route path="/rules"          element={<Rules />} />
               <Route path="/settings"       element={<Settings />} />
               <Route path="/lobby"          element={<Lobby />} />
-              <Route path="/lobby/:roomId"  element={<LobbyRoom />} />
-              <Route path="/online/:roomId" element={<OnlineGameBoard />} />
+              <Route path="/lobby/:roomId"  element={<RequireAuth><LobbyRoom /></RequireAuth>} />
+              <Route path="/online/:roomId" element={<RequireAuth><OnlineGameBoard /></RequireAuth>} />
               <Route path="*"              element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>

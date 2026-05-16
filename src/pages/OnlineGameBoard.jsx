@@ -67,10 +67,14 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     const doLeave = () => {
       const r = roomRef.current;
       if (!r) return;
-      updateDoc(doc(db, 'rooms', roomId), {
-        players: r.players.filter(p => p.uid !== myUid),
+      const remaining = r.players.filter(p => p.uid !== myUid);
+      const updates = {
+        players: remaining,
+        playerUids: remaining.map(p => p.uid),
         updatedAt: serverTimestamp(),
-      }).catch(() => {});
+      };
+      if (r.hostUid === myUid && remaining.length > 0) updates.hostUid = remaining[0].uid;
+      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
     };
 
     window.addEventListener('pagehide', doLeave);
@@ -104,10 +108,16 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     });
 
     if (stalePlayer) {
-      updateDoc(doc(db, 'rooms', roomId), {
-        players: room.players.filter(p => p.uid !== stalePlayer.uid),
+      const remaining = room.players.filter(p => p.uid !== stalePlayer.uid);
+      const updates = {
+        players: remaining,
+        playerUids: remaining.map(p => p.uid),
         updatedAt: serverTimestamp(),
-      }).catch(() => {});
+      };
+      if (room.hostUid === stalePlayer.uid && remaining.length > 0) {
+        updates.hostUid = remaining[0].uid;
+      }
+      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
     }
   }, [room.presence, gameHook.state.players, gameHook.state.phase]);
 

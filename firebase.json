@@ -14,6 +14,21 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' https://accounts.google.com https://apis.google.com https://www.gstatic.com https://www.google.com 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://www.google.com https://www.gstatic.com wss://*.firebaseio.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com; font-src 'self' data:; frame-src 'self' https://accounts.google.com https://ludo-get-angry.firebaseapp.com https://www.google.com https://recaptcha.google.com; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self' https://accounts.google.com"
+          },
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
+          }
+        ]
+      }
     ]
   },
   "firestore": {

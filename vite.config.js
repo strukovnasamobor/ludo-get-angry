@@ -8,6 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png', 'i18n/en.json', 'i18n/hr.json'],
+      workbox: {
+        // Don't hijack Firebase Auth's reserved paths with the SPA fallback —
+        // the popup needs the real /__/auth/handler served by Firebase Hosting.
+        navigateFallbackDenylist: [/^\/__\//],
+      },
       manifest: {
         id: "hr.strukovnasamobor.ludo_get_angry",
         name: 'Ludo Get Angry',
@@ -29,8 +34,8 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Set to true in production
-        drop_debugger: true, // Set to true in production
+        drop_console: false,  // Set to true in production
+        drop_debugger: false,  // Set to true in production
       },
     },
   },

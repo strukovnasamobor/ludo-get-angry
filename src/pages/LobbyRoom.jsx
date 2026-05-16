@@ -38,7 +38,12 @@ export default function LobbyRoom() {
       const u = userRef.current;
       if (r?.status !== 'waiting' || !u) return;
       const remaining = r.players.filter(p => p.uid !== u.uid);
-      const updates = { players: remaining, updatedAt: serverTimestamp() };
+      const remainingUids = remaining.map(p => p.uid);
+      const updates = {
+        players: remaining,
+        playerUids: remainingUids,
+        updatedAt: serverTimestamp(),
+      };
       if (r.hostUid === u.uid && remaining.length > 0) updates.hostUid = remaining[0].uid;
       updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
     };
@@ -73,6 +78,7 @@ export default function LobbyRoom() {
 
     updateDoc(doc(db, 'rooms', roomId), {
       players: arrayUnion(entry),
+      playerUids: arrayUnion(user.uid),
       updatedAt: serverTimestamp(),
     })
       .then(() => setJoined(true))

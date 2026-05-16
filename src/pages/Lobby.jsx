@@ -16,7 +16,7 @@ function generateCode() {
 
 export default function Lobby() {
   const navigate = useNavigate();
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const { user, loading, signInWithGoogle, signOut, redirectError } = useAuth();
   const { t, lang, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [joinCode, setJoinCode]       = useState('');
@@ -59,6 +59,7 @@ export default function Lobby() {
         hostUid: user.uid,
         status: 'waiting',
         players: [{ uid: user.uid, name, color: PLAYER_ORDER[0], index: 0 }],
+        playerUids: [user.uid],
         gameState: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -121,7 +122,9 @@ export default function Lobby() {
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="20" height="20" />
             {t('lobbySignInGoogle')}
           </button>
-          {signInError && <p className="lobby-error" style={{ marginTop: '12px' }}>{signInError}</p>}
+          {(signInError || redirectError) && (
+            <p className="lobby-error" style={{ marginTop: '12px' }}>{signInError || redirectError}</p>
+          )}
         </div>
       </div>
     );

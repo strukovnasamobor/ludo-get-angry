@@ -1,9 +1,8 @@
-? testing online game, firestore baza, brisanje računa - Privacy Policy
-- review security, vulnerabilities and firebase rules protection
+? testing online game
 - review games rules
 
 Ver. 1.0.0 (1)
-- change production flags: firebase.js, vite.config.js
 - deploy and make TWA with PWA Web Builder
 - Google Play Store new edition
+- change production flags: firebase.js, vite.config.js
 - change assetlinks.json

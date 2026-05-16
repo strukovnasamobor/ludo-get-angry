@@ -5,6 +5,7 @@ service cloud.firestore {
 
     function isAllowedUser() {
       return request.auth != null
+        && request.app != null
         && request.auth.token.email is string
         && request.auth.token.email.lower().matches('.*@gmail[.]com');
     }

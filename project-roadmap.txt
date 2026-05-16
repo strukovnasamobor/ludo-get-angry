@@ -1,4 +1,4 @@
-? testing online game
+? testing online game, request.app != null in firebase rules
 - review games rules
 
 Ver. 1.0.0 (1)

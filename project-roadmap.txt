@@ -3,7 +3,7 @@
 - activate AppCheck for firestore and auth
 - test PWA install and test
 - review games rules
-- review security, vulnerabilities and firebase rules
+- review security, vulnerabilities and firebase rules protection
 
 Ver. 1.0.0 (1)
 - change production flags: firebase.js, vite.config.js

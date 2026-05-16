@@ -1,5 +1,5 @@
-- add web link and header at index
-- privacy_policy adn terms_and_conditions
+- privacy_policy adn terms_and_conditions - review both collector and ludo
+? brisanje računa
 - test PWA install and run
 - activate Google Auth
 - activate AppCheck

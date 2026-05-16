@@ -108,6 +108,10 @@
   "settingsLegal": "Legal",
   "settingsPrivacy": "Privacy Policy",
   "settingsTerms": "Terms & Conditions",
+  "settingsAbout": "About",
+  "settingsWebApp": "Web App",
+  "settingsSource": "Source Code",
+  "settingsSupport": "Support the Project",
 
   "lobbyCreate": "Create Room",
   "lobbyCreateBtn": "Create Room",

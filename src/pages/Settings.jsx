@@ -75,6 +75,39 @@ export default function Settings() {
             </a>
           </div>
         </div>
+
+        <div className="setting-group card">
+          <span className="setting-label">{t('settingsAbout')}</span>
+          <div className="setting-links">
+            <a
+              className="setting-link"
+              href="https://ludo-get-angry.web.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span>🌐 {t('settingsWebApp')}</span>
+              <span className="setting-link-icon" aria-hidden="true">↗</span>
+            </a>
+            <a
+              className="setting-link"
+              href="https://github.com/strukovnasamobor/ludo-get-angry"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span>💻 {t('settingsSource')}</span>
+              <span className="setting-link-icon" aria-hidden="true">↗</span>
+            </a>
+            <a
+              className="setting-link"
+              href="https://www.paypal.com/ncp/payment/5J3YEQBD34SW6"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span>❤️ {t('settingsSupport')}</span>
+              <span className="setting-link-icon" aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

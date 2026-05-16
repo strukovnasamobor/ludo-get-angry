@@ -1,5 +1,4 @@
-- oneTap prijava Google Auth
-? testiranje online igre, firestore baza, brisanje računa - Privacy Policy
+? testing online game, firestore baza, brisanje računa - Privacy Policy
 - review security, vulnerabilities and firebase rules protection
 - review games rules
 

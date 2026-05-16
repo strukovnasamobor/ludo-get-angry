@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -23,13 +23,6 @@ export default function Lobby() {
   const [error, setError]             = useState('');
   const [busy, setBusy]               = useState(false);
   const [signInError, setSignInError] = useState('');
-  const autoPromptedRef               = useRef(false);
-
-  useEffect(() => {
-    if (loading || user || autoPromptedRef.current) return;
-    autoPromptedRef.current = true;
-    signInWithGoogle().catch(err => setSignInError(err?.message || 'sign-in failed'));
-  }, [loading, user, signInWithGoogle]);
 
   function handleSignInClick() {
     setSignInError('');

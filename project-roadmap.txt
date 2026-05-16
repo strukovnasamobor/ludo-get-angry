@@ -1,6 +1,5 @@
 - oneTap prijava Google Auth
 ? testiranje online igre, firestore baza, brisanje računa - Privacy Policy
-- test PWA install and test
 - review games rules
 - review security, vulnerabilities and firebase rules protection
 

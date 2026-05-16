@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -19,9 +19,22 @@ export default function Lobby() {
   const { user, loading, signInWithGoogle, signOut } = useAuth();
   const { t, lang, setLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const [joinCode, setJoinCode] = useState('');
-  const [error, setError]       = useState('');
-  const [busy, setBusy]         = useState(false);
+  const [joinCode, setJoinCode]       = useState('');
+  const [error, setError]             = useState('');
+  const [busy, setBusy]               = useState(false);
+  const [signInError, setSignInError] = useState('');
+  const autoPromptedRef               = useRef(false);
+
+  useEffect(() => {
+    if (loading || user || autoPromptedRef.current) return;
+    autoPromptedRef.current = true;
+    signInWithGoogle().catch(err => setSignInError(err?.message || 'sign-in failed'));
+  }, [loading, user, signInWithGoogle]);
+
+  function handleSignInClick() {
+    setSignInError('');
+    signInWithGoogle().catch(err => setSignInError(err?.message || 'sign-in failed'));
+  }
 
   if (loading) return <div className="page lobby-page"><p>...</p></div>;
 
@@ -111,10 +124,11 @@ export default function Lobby() {
           <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '24px' }}>
             {t('lobbySignInPrompt')}
           </p>
-          <button className="btn btn-primary btn-lg lobby-google-btn" onClick={signInWithGoogle}>
+          <button className="btn btn-primary btn-lg lobby-google-btn" onClick={handleSignInClick}>
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="" width="20" height="20" />
             {t('lobbySignInGoogle')}
           </button>
+          {signInError && <p className="lobby-error" style={{ marginTop: '12px' }}>{signInError}</p>}
         </div>
       </div>
     );

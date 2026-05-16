@@ -10,10 +10,10 @@ export default defineConfig({
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png', 'i18n/en.json', 'i18n/hr.json'],
       manifest: {
         id: "hr.strukovnasamobor.ludo_get_angry",
-        name: 'Lugo Get Angry',
-        short_name: 'Lugo Get Angry',
+        name: 'Ludo Get Angry',
+        short_name: 'Ludo Get Angry',
         theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

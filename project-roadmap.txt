@@ -1,13 +1,11 @@
-- privacy_policy adn terms_and_conditions - review both collector and ludo
-? brisanje računa
-- test PWA install and run
-- activate Google Auth
+- activate Google Auth, oneTap prijava
 - activate AppCheck
+- test PWA install and run
+? testiranje online igre, firestore baza, brisanje računa - Privacy Policy
 - review games rules
 - review security, vulnerabilities and firebase rules
 
 Ver. 1.0.0 (1)
-- publish to public GitHub i dodati @JanJagustovic
 - change production flags: firebase.js, vite.config.js
 - deploy and make TWA with PWA Web Builder
 - Google Play Store new edition

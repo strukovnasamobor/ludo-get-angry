@@ -1,7 +1,6 @@
 .lobby-page {
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
 }
 
 .lobby-header {
@@ -84,7 +83,6 @@
 .lobby-room-page {
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
 }
 
 .lobby-room-content {

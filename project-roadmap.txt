@@ -1,8 +1,6 @@
-? testing online game, request.app != null in firebase rules
 - review games rules
 
 Ver. 1.0.0 (1)
 - deploy and make TWA with PWA Web Builder
 - Google Play Store new edition
-- change production flags: firebase.js, vite.config.js
 - change assetlinks.json

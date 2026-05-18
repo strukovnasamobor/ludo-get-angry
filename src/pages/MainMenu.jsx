@@ -5,15 +5,15 @@ import './MainMenu.css';
 
 export default function MainMenu() {
   const navigate = useNavigate();
-  const { t, lang, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="menu-page page">
       <div className="menu-header">
         <div style={{ display: 'flex', gap: '2px' }}>
-          <button className="btn btn-ghost menu-theme-btn" onClick={() => setLanguage(lang === 'hr' ? 'en' : 'hr')}>
-            {lang.toUpperCase()}
+          <button className="btn btn-ghost menu-theme-btn" onClick={() => navigate('/rules')} aria-label={t('menuRules')}>
+            📖
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? '🌙' : '☀️'}

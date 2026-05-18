@@ -421,22 +421,14 @@ function afterMove(state, move, preMoveSpecials = null) {
   const player = state.players[state.currentPlayerIndex];
   const effectiveSpecials = preMoveSpecials ?? player.specialsHeld;
   const hasSpecials = effectiveSpecials.length > 0;
-  const hasBridge = effectiveSpecials.includes('most');
   const spKey = `${move.ring}-${move.idx}`;
   const activeColors = state.players.map(p => p.color);
-  const isSpawnPoint = typeof move.ring === 'string' && activeColors.some(color => {
-    const pd = PLAYERS[color];
-    return pd && (
-      (move.ring === 'outer' && move.idx === pd.exitOuter) ||
-      (move.ring === 'inner' && move.idx === pd.exitInner)
-    );
-  });
+  // Rule 9.2: no special — BRIDGE included — may be placed on a HOME-exit cell.
   const validPlacement = (move.type === 'move' || move.type === 'exit') &&
-    !state.specialsOnBoard[spKey] && (
-      isSpawnPoint
-        ? hasBridge && !!canPlaceMost(move.ring, move.idx, state.bridgesOnBoard)
-        : hasSpecials && canPlaceSpecial(move.ring, move.idx, activeColors)
-    );
+    !state.specialsOnBoard[spKey] &&
+    !state.bridgesOnBoard[spKey] &&
+    hasSpecials &&
+    canPlaceSpecial(move.ring, move.idx, activeColors);
 
   if (validPlacement) {
     return { ...state, phase: 'placing-special', lastMoveRing: move.ring, lastMoveIdx: move.idx };
@@ -656,11 +648,20 @@ function reducer(state, action) {
     case 'PLACE_SPECIAL': {
       const { ring, idx, specialType } = action;
       const player = state.players[state.currentPlayerIndex];
-      if (specialType === 'most' && !canPlaceMost(ring, idx, state.bridgesOnBoard)) {
-        return state;
-      }
-      if (specialType !== 'most' && !canPlaceSpecial(ring, idx, state.players.map(p => p.color))) {
-        return state;
+      const placeKey = `${ring}-${idx}`;
+
+      // Rule 9.2: cell must not already host a special (or bridge endpoint).
+      if (state.specialsOnBoard[placeKey]) return state;
+      if (state.bridgesOnBoard[placeKey])  return state;
+
+      // Rule 9.2: every special — BRIDGE included — must not be placed on
+      // an active player's HOME-exit cell.
+      if (!canPlaceSpecial(ring, idx, state.players.map(p => p.color))) return state;
+      if (specialType === 'most') {
+        if (!canPlaceMost(ring, idx, state.bridgesOnBoard)) return state;
+        // Bridge's parallel endpoint must also not host a non-bridge special.
+        const dest = getBridgeParallel(ring, idx);
+        if (dest && state.specialsOnBoard[`${dest.ring}-${dest.idx}`]) return state;
       }
       const newPlayers = deepCopyPlayers(state.players).map(p => {
         if (p.color !== player.color) return p;
@@ -691,6 +692,23 @@ function reducer(state, action) {
 
       if (figHere && figHere.player.color !== player.color) {
         // Immediate activation on opponent's figure
+        nextState = applySpecialTrigger(nextState, {
+          type: specialType,
+          ring,
+          idx,
+          figId: figHere.figure.id,
+          playerColor: figHere.player.color,
+          placedBy: player.color,
+        });
+      } else if (
+        figHere
+        && figHere.player.color === player.color
+        // bomba arms placer's piece (handled above), zamjena on self is meaningless
+        && specialType !== 'bomba'
+        && specialType !== 'zamjena'
+      ) {
+        // Rules 9.a, 9.b, 9.c, 9.e: special "just activates" for placer's own piece
+        // sitting on the cell when the special is placed.
         nextState = applySpecialTrigger(nextState, {
           type: specialType,
           ring,
@@ -848,6 +866,9 @@ function reducer(state, action) {
 
     case 'RESOLVE_ZAMJENA': {
       const { trigger, targetColor, targetFigId } = action;
+      // Rule 9.f: target must belong to the player who PLACED the swap.
+      if (!trigger || trigger.type !== 'zamjena') return state;
+      if (targetColor !== trigger.placedBy) return state;
       let newPlayers = deepCopyPlayers(state.players);
       const mover = newPlayers.find(p => p.color === trigger.playerColor);
       const myFig = mover.figures.find(f => f.id === trigger.figId);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GRID, PLAYERS, OUTER_PATH, INNER_PATH, getBridgeParallel } from '../../data/boardLayout.js';
+import { useLanguage } from '../../contexts/LanguageContext.jsx';
 import './Board.css';
 
 const CENTER_PIPS = {
@@ -11,7 +12,7 @@ const CENTER_PIPS = {
   6: [[25,22],[75,22],[25,50],[75,50],[25,78],[75,78]],
 };
 
-function CenterDie({ value, onRoll, disabled, rollsLeft, showRollCount }) {
+function CenterDie({ value, onRoll, disabled, rollsLeft, showRollCount, playerColor }) {
   const [rolling, setRolling] = useState(false);
 
   function handleRoll() {
@@ -26,6 +27,7 @@ function CenterDie({ value, onRoll, disabled, rollsLeft, showRollCount }) {
       <div
         className={`center-die${value ? ' center-die--has-value' : ''}${!disabled ? ' center-die--active' : ''}${rolling ? ' center-die--rolling' : ''}`}
         onClick={handleRoll}
+        style={playerColor ? { '--player-color': COLOR_HEX[playerColor] } : undefined}
       >
         {value
           ? CENTER_PIPS[value]?.map(([x, y], i) => (
@@ -48,6 +50,11 @@ const SPECIAL_ICONS = {
   bomba:   '💣',
   stop:    '⏸️',
   zamjena: '🔄',
+};
+
+const SPECIAL_KEYS = {
+  most: 'specialMost', kocka: 'specialKocka', rewind: 'specialRewind',
+  bomba: 'specialBomba', stop: 'specialStop', zamjena: 'specialZamjena',
 };
 
 const COLOR_HEX = {
@@ -158,14 +165,15 @@ function BridgeOverlay({ bridgesOnBoard }) {
   );
 }
 
-function Figure({ playerColor, figId, isMoveable, isStop, isRewind, isBomb, onClick }) {
+function Figure({ playerColor, playerName, figId, isMoveable, isStop, isRewind, isBomb, onClick }) {
   const extra = isStop ? ' figure--stop' : isRewind ? ' figure--rewind' : isBomb ? ' figure--bomb' : '';
+  const label = playerName || playerColor;
   return (
     <div
       className={`figure${isMoveable ? ' figure--moveable' : ''}${extra}`}
       style={{ backgroundColor: COLOR_HEX[playerColor] }}
       onClick={onClick}
-      title={`${playerColor} #${figId}${isStop ? ' ⏸️' : isRewind ? ' ⏪' : isBomb ? ' 💣' : ''}`}
+      title={`${label} #${figId + 1}${isStop ? ' ⏸️' : isRewind ? ' ⏪' : isBomb ? ' 💣' : ''}`}
     />
   );
 }
@@ -183,7 +191,9 @@ export default function Board({
   diceDisabled,
   rollsLeft,
   showRollCount,
+  currentPlayerColor,
 }) {
+  const { t } = useLanguage();
   const players = Array.isArray(gamePlayers) ? gamePlayers : [];
   const spawnMap = buildSpawnMap(players);
 
@@ -195,10 +205,12 @@ export default function Board({
           const isMoveable = moveableFigures?.some(
             m => m.figId === fig.id && m.playerColor === fig.playerColor
           );
+          const playerName = players.find(p => p.color === fig.playerColor)?.name;
           return (
             <Figure
               key={`${fig.playerColor}-${fig.id}`}
               playerColor={fig.playerColor}
+              playerName={playerName}
               figId={fig.id}
               isMoveable={isMoveable}
               isStop={!!fig.stopActive}
@@ -223,21 +235,27 @@ export default function Board({
       const spawn = spawnMap[key];
       let content = null;
       let specialIcon = null;
+      let specialLabel = null;
       let specialBadge = false;
+      let swapPlacerColor = null;
 
       if (cell.type === 'outer-path') {
         const spKey = `outer-${cell.outerIdx}`;
         const figs = getFiguresOnCell('outer', cell.outerIdx, players);
         // Non-bridge special takes priority for the icon; bridge shown on parallel cell too
         if (specialsOnBoard?.[spKey]) {
-          specialIcon = SPECIAL_ICONS[specialsOnBoard[spKey].type];
+          const sp = specialsOnBoard[spKey];
+          specialIcon = SPECIAL_ICONS[sp.type];
+          specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
+          if (sp.type === 'zamjena' && sp.placedBy) swapPlacerColor = COLOR_HEX[sp.placedBy];
         } else {
           const hasBridge = bridgesOnBoard?.[spKey];
           const dest = getBridgeParallel('outer', cell.outerIdx);
           const parallelHasBridge = dest && bridgesOnBoard?.[`${dest.ring}-${dest.idx}`];
           if (hasBridge || parallelHasBridge) {
             specialIcon = SPECIAL_ICONS['most'];
+            specialLabel = t('specialMost');
             specialBadge = figs.length > 0;
           }
         }
@@ -248,14 +266,18 @@ export default function Board({
         const spKey = `inner-${cell.innerIdx}`;
         const figs = getFiguresOnCell('inner', cell.innerIdx, players);
         if (specialsOnBoard?.[spKey]) {
-          specialIcon = SPECIAL_ICONS[specialsOnBoard[spKey].type];
+          const sp = specialsOnBoard[spKey];
+          specialIcon = SPECIAL_ICONS[sp.type];
+          specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
+          if (sp.type === 'zamjena' && sp.placedBy) swapPlacerColor = COLOR_HEX[sp.placedBy];
         } else {
           const hasBridge = bridgesOnBoard?.[spKey];
           const dest = getBridgeParallel('inner', cell.innerIdx);
           const parallelHasBridge = dest && bridgesOnBoard?.[`${dest.ring}-${dest.idx}`];
           if (hasBridge || parallelHasBridge) {
             specialIcon = SPECIAL_ICONS['most'];
+            specialLabel = t('specialMost');
             specialBadge = figs.length > 0;
           }
         }
@@ -300,7 +322,11 @@ export default function Board({
             </span>
           )}
           {specialIcon && (
-            <span className={`special-icon${specialBadge ? ' special-icon--badge' : ''}`}>
+            <span
+              className={`special-icon${specialBadge ? ' special-icon--badge' : ''}${swapPlacerColor ? ' special-icon--swap' : ''}`}
+              style={swapPlacerColor ? { '--placer-color': swapPlacerColor } : undefined}
+              title={specialLabel || undefined}
+            >
               {specialIcon}
             </span>
           )}
@@ -323,6 +349,7 @@ export default function Board({
           disabled={diceDisabled}
           rollsLeft={rollsLeft}
           showRollCount={showRollCount}
+          playerColor={currentPlayerColor}
         />
       )}
     </div>

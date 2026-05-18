@@ -50,7 +50,7 @@
   "duelDefender": "Defender",
 
   "initialRollTitle": "Who goes first?",
-  "initialRollTie": "Tie — same players roll again!",
+  "initialRollTie": "Tie - same players roll again!",
   "initialRollStarts": "starts!",
   "initialRollBtn": "roll!",
   "initialRollReroll": "Roll again",
@@ -64,9 +64,9 @@
   "zamjenaNoFigs": "No pieces available to swap.",
   "zamjenaFig": "Piece",
   "zamjenaSkip": "Skip",
-  "zamjenaOwnField": "This is your own SWAP field — no effect.",
+  "zamjenaOwnField": "This is your own SWAP field - no effect.",
 
-  "mostCannotPlace": "BRIDGE not possible — no free parallel square",
+  "mostCannotPlace": "BRIDGE not possible - no free parallel square",
   "mostCannotField": "BRIDGE not possible on this square",
 
   "pickupChoiceTitle": "Pick up which field?",
@@ -93,6 +93,8 @@
   "specialZamjenaRoll": "Roll dice to choose color",
 
   "specialBombaMsg": "Boom! Your piece went home.",
+  "bombAlertTitle": "Bomb armed!",
+  "bombAlertMsg": "Move the piece that has activated the BOMB or it will return to HOME.",
   "specialStopMsg": "Stop! Piece can only move by 1.",
   "specialRewindMsg": "Rewind! Next move goes backward.",
   "specialKockaMsg": "Dice! Roll two dice.",

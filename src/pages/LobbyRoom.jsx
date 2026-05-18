@@ -7,8 +7,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { PLAYER_ORDER, PLAYERS } from '../data/boardLayout';
 import Modal from '../components/Modal.jsx';
+import { RulesContent } from './Rules.jsx';
 import './Lobby.css';
 import './GameSetup.css';
+import './Rules.css';
 
 const COLOR_HEX = Object.fromEntries(
   Object.entries(PLAYERS).map(([k, v]) => [k, v.color])
@@ -18,13 +20,14 @@ export default function LobbyRoom() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const { t, lang, setLanguage } = useLanguage();
+  const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [room, setRoom]           = useState(null);
   const [joined, setJoined]       = useState(false);
   const [error, setError]         = useState('');
   const [myName, setMyName]       = useState('');
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showRules, setShowRules]               = useState(false);
   const initializedRef      = useRef(false);
   const roomRef             = useRef(null);
   const userRef             = useRef(user);
@@ -135,8 +138,8 @@ export default function LobbyRoom() {
       <div className="lobby-header">
         <button className="btn btn-ghost setup-back-btn" onClick={() => setShowLeaveConfirm(true)}>←</button>
         <div style={{ display: 'flex', gap: '2px' }}>
-          <button className="btn btn-ghost menu-theme-btn" onClick={() => setLanguage(lang === 'hr' ? 'en' : 'hr')}>
-            {lang.toUpperCase()}
+          <button className="btn btn-ghost menu-theme-btn" onClick={() => setShowRules(true)} aria-label={t('menuRules')}>
+            📖
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? '🌙' : '☀️'}
@@ -222,6 +225,12 @@ export default function LobbyRoom() {
           <p style={{ textAlign: 'center' }}>{t('lobbyLeaveMsg')}</p>
           <button className="btn btn-danger" onClick={() => navigate('/lobby')}>{t('lobbyLeaveYes')}</button>
           <button className="btn btn-secondary" onClick={() => setShowLeaveConfirm(false)}>{t('lobbyLeaveNo')}</button>
+        </Modal>
+      )}
+
+      {showRules && (
+        <Modal title={t('rulesTitle')} onClose={() => setShowRules(false)} wide>
+          <RulesContent lang={lang} />
         </Modal>
       )}
     </div>

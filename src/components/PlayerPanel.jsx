@@ -4,6 +4,11 @@ const SPECIAL_ICONS = {
   most: '🌉', kocka: '🎲', rewind: '⏪', bomba: '💣', stop: '⏸️', zamjena: '🔄',
 };
 
+const SPECIAL_KEYS = {
+  most: 'specialMost', kocka: 'specialKocka', rewind: 'specialRewind',
+  bomba: 'specialBomba', stop: 'specialStop', zamjena: 'specialZamjena',
+};
+
 const COLOR_HEX = {
   red: '#e53935', yellow: '#fdd835', blue: '#1e88e5', green: '#43a047',
   cyan: '#00838f', purple: '#8e24aa', magenta: '#f06292', orange: '#fb8c00',
@@ -94,7 +99,7 @@ export default function PlayerPanel({
               key={type}
               className={`special-chip ${selectedSpecial === type ? 'special-chip--selected' : ''} ${phase === 'placing-special' ? 'special-chip--active' : ''} ${isDisabled ? 'special-chip--disabled' : ''}`}
               onClick={() => phase === 'placing-special' && onSelectSpecialForPlace?.(type)}
-              title={isDisabled ? t('mostCannotField') : type}
+              title={isDisabled ? t('mostCannotField') : t(SPECIAL_KEYS[type])}
             >
               {SPECIAL_ICONS[type]}{count > 1 ? <span className="special-chip-count">×{count}</span> : ''}
             </button>

@@ -8,7 +8,9 @@ import { canPlaceMost, OUTER_PATH, INNER_PATH, PLAYERS } from '../data/boardLayo
 import Board from '../components/Board/Board.jsx';
 import PlayerPanel from '../components/PlayerPanel.jsx';
 import Modal from '../components/Modal.jsx';
+import { RulesContent } from './Rules.jsx';
 import './GameBoard.css';
+import './Rules.css';
 
 const COLOR_HEX = {
   red: '#e53935', yellow: '#fdd835', blue: '#1e88e5', green: '#43a047',
@@ -24,7 +26,7 @@ function loadSetup() {
 
 export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerColor = null, playAgainPath = '/setup', isHost = true }) {
   const navigate = useNavigate();
-  const { t, lang, setLanguage } = useLanguage();
+  const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
   const setup = loadSetup();
@@ -42,9 +44,21 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   const [selectedSpecialType, setSelectedSpecialType] = useState(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showRules, setShowRules]             = useState(false);
+  const [showBombAlert, setShowBombAlert]     = useState(false);
   const [inStuckRolls, setInStuckRolls] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const autoAdvanceRef = useRef(null);
+  const prevArmedKeyRef = useRef(null);
+
+  useEffect(() => {
+    if (!isMyTurn || !state.players?.length) { prevArmedKeyRef.current = null; return; }
+    const me = state.players[state.currentPlayerIndex];
+    const armed = me?.figures.find(f => f.bombActive);
+    const key = armed ? `${state.currentPlayerIndex}-${armed.id}` : null;
+    if (key && key !== prevArmedKeyRef.current) setShowBombAlert(true);
+    prevArmedKeyRef.current = key;
+  }, [state.currentPlayerIndex, state.players, isMyTurn]);
 
   // Derived
   const phase = state.phase;
@@ -114,11 +128,14 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   useEffect(() => {
     if (isOver || isInitialRoll) return;
     setTimeLeft(30);
+    let remaining = 30;
     const id = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) { autoAdvanceRef.current?.(); return 30; }
-        return prev - 1;
-      });
+      remaining -= 1;
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(id);
+        autoAdvanceRef.current?.();
+      }
     }, 1000);
     return () => clearInterval(id);
   }, [stateKey, isOver, isInitialRoll]);
@@ -259,14 +276,14 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         <button className="btn btn-ghost game-exit-btn" onClick={() => setShowExitConfirm(true)}>✕</button>
         <span className="game-turn-label" style={{ color: COLOR_HEX[currentPlayer.color] }}>
           {currentPlayer.name}
-          {phase === 'rolling' && ' — 🎲'}
-          {phase === 'moving' && ` — ${t('gamePhaseMoving')}`}
-          {phase === 'placing-special' && ` — ${t('gamePhasePlacing')}`}
-          {phase === 'duel' && ` — ${t('gamePhaseDuel')}`}
+          {phase === 'rolling' && ' - 🎲'}
+          {phase === 'moving' && ` - ${t('gamePhaseMoving')}`}
+          {phase === 'placing-special' && ` - ${t('gamePhasePlacing')}`}
+          {phase === 'duel' && ` - ${t('gamePhaseDuel')}`}
         </span>
         <div className="game-topbar-actions">
-          <button className="btn btn-ghost menu-theme-btn" onClick={() => setLanguage(lang === 'hr' ? 'en' : 'hr')}>
-            {lang.toUpperCase()}
+          <button className="btn btn-ghost menu-theme-btn" onClick={() => setShowRules(true)} aria-label={t('menuRules')}>
+            ❓
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? '🌙' : '☀️'}
@@ -278,8 +295,11 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
       {!isOver && !isInitialRoll && (
         <div className="game-timer-track">
           <div
-            className={`game-timer-bar ${timeLeft <= 7 ? 'game-timer-bar--urgent' : timeLeft <= 15 ? 'game-timer-bar--warning' : ''}`}
-            style={{ width: `${(timeLeft / 30) * 100}%` }}
+            className={`game-timer-bar ${timeLeft <= 10 ? 'game-timer-bar--pulse' : ''}`}
+            style={{
+              width: `${(timeLeft / 30) * 100}%`,
+              background: COLOR_HEX[currentPlayer.color],
+            }}
           />
         </div>
       )}
@@ -399,7 +419,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
                   className="btn btn-secondary"
                   onClick={() => { selectMove(m); setPickupChoiceMoves(null); }}
                 >
-                  {multiFig ? `${t('zamjenaFig')} ${m.figId + 1} — ${fieldLabel}` : fieldLabel}
+                  {multiFig ? `${t('zamjenaFig')} ${m.figId + 1} - ${fieldLabel}` : fieldLabel}
                 </button>
               );
             })}
@@ -416,9 +436,10 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         const canRollDef = !myPlayerColor || myPlayerColor === ds.defColor;
         return (
           <Modal title={t('duelTitle')}>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              <span style={{ color: COLOR_HEX[ds.atkColor] }}>●</span> {t('duelVs')}{' '}
-              <span style={{ color: COLOR_HEX[ds.defColor] }}>●</span>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+              <span style={{ color: COLOR_HEX[ds.atkColor], fontWeight: 600 }}>● {atkName}</span>
+              {' '}{t('duelVs')}{' '}
+              <span style={{ color: COLOR_HEX[ds.defColor], fontWeight: 600 }}>● {defName}</span>
             </p>
             {ds.atkRoll === null && canRollAtk && (
               <button className="btn btn-primary" onClick={() => handleDuelRoll('atk')}>
@@ -478,6 +499,20 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           <p style={{ textAlign: 'center' }}>{t('exitConfirmMsg')}</p>
           <button className="btn btn-danger" onClick={() => navigate('/')}>{t('exitConfirmYes')}</button>
           <button className="btn btn-secondary" onClick={() => setShowExitConfirm(false)}>{t('exitConfirmNo')}</button>
+        </Modal>
+      )}
+
+      {showRules && (
+        <Modal title={t('rulesTitle')} onClose={() => setShowRules(false)} wide>
+          <RulesContent lang={lang} />
+        </Modal>
+      )}
+
+      {showBombAlert && (
+        <Modal title={t('bombAlertTitle')} onClose={() => setShowBombAlert(false)}>
+          <p style={{ textAlign: 'center', fontSize: '2rem' }}>💣</p>
+          <p style={{ textAlign: 'center' }}>{t('bombAlertMsg')}</p>
+          <button className="btn btn-primary" onClick={() => setShowBombAlert(false)}>{t('ok')}</button>
         </Modal>
       )}
 
@@ -578,7 +613,7 @@ function KockaModal({ t, trigger, onKockaSetRoll, onKocka, isMyTurn = true }) {
         </div>
       ) : (
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRoll} disabled={!isMyTurn}>
-          🎲🎲 {t('gameRoll')}
+          🎲 🎲 {t('gameRoll')}
         </button>
       )}
     </Modal>
@@ -681,7 +716,7 @@ function InitialRollModal({ state, players, onRoll, onContinue, onStart, t }) {
             >
               <span style={{ color: COLOR_HEX[color], fontWeight: 700 }}>● {player?.name}</span>
               <span style={{ fontSize: '1.5rem', fontWeight: 900, color: isMax ? COLOR_HEX[color] : 'var(--text-primary)' }}>
-                {roll !== undefined ? roll : isCurrent ? '?' : '—'}
+                {roll !== undefined ? roll : isCurrent ? '?' : '-'}
               </span>
             </div>
           );

@@ -14,19 +14,48 @@
   width: 100%;
   max-width: 340px;
   max-height: 80svh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: fadeIn 0.2s ease;
+}
+
+.modal-box--wide {
+  max-width: 520px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  z-index: 1;
 }
 
 .modal-title {
   font-size: 1.05rem;
   font-weight: 700;
-  margin-bottom: var(--sp-md);
   color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-close-btn {
+  padding: 4px 10px;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .modal-body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-sm);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }

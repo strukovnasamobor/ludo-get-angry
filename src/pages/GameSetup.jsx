@@ -22,7 +22,7 @@ function initPlayers(count, label) {
 
 export default function GameSetup() {
   const navigate = useNavigate();
-  const { t, lang, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [count, setCount] = useState(4);
   const [players, setPlayers] = useState(() => initPlayers(4, t('setupPlayerName')));
@@ -59,8 +59,8 @@ export default function GameSetup() {
         <button className="btn btn-ghost setup-back-btn" onClick={() => navigate('/')}>←</button>
         <h2 className="setup-title">{t('setupTitle')}</h2>
         <div className="setup-header-actions">
-          <button className="btn btn-ghost menu-theme-btn" onClick={() => setLanguage(lang === 'hr' ? 'en' : 'hr')}>
-            {lang.toUpperCase()}
+          <button className="btn btn-ghost menu-theme-btn" onClick={() => navigate('/rules')} aria-label={t('menuRules')}>
+            📖
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === 'dark' ? '🌙' : '☀️'}

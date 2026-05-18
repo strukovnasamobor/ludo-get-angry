@@ -17,7 +17,7 @@ function generateCode() {
 export default function Lobby() {
   const navigate = useNavigate();
   const { user, loading, signInWithGoogle, signOut, redirectError } = useAuth();
-  const { t, lang, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [joinCode, setJoinCode]       = useState('');
   const [error, setError]             = useState('');
@@ -99,8 +99,8 @@ export default function Lobby() {
     <div className="lobby-header">
       <button className="btn btn-ghost setup-back-btn" onClick={() => navigate('/')}>←</button>
       <div style={{ display: 'flex', gap: '2px' }}>
-        <button className="btn btn-ghost menu-theme-btn" onClick={() => setLanguage(lang === 'hr' ? 'en' : 'hr')}>
-          {lang.toUpperCase()}
+        <button className="btn btn-ghost menu-theme-btn" onClick={() => navigate('/rules')} aria-label={t('menuRules')}>
+          📖
         </button>
         <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
           {theme === 'dark' ? '🌙' : '☀️'}

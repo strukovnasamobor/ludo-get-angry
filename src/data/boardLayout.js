@@ -254,9 +254,11 @@ export function canPlaceMost(ring, idx, bridgesOnBoard) {
   return dest;
 }
 
-// Check if a cell can receive a special square (rule 9b).
+// Check if a cell can receive a special square (rule 9.2).
 // activeColors: array of color strings for players currently in the game.
-// Blocked only if the cell is a spawn point (exitOuter/exitInner) of an active player.
+// Blocked if the cell is an active player's HOME-exit cell (spawn point) on
+// either ring. Finish-entry cells are NOT blocked — the rule prohibits placing
+// only on the exit FROM home, not the entry INTO finish.
 export function canPlaceSpecial(ring, idx, activeColors) {
   const { r, c } = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
   const cell = GRID[r][c];

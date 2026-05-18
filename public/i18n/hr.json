@@ -50,7 +50,7 @@
   "duelDefender": "Branič",
 
   "initialRollTitle": "Tko ide prvi?",
-  "initialRollTie": "Izjednačeno — isti igrači bacaju opet!",
+  "initialRollTie": "Izjednačeno - isti igrači bacaju opet!",
   "initialRollStarts": "počinje!",
   "initialRollBtn": "baci!",
   "initialRollReroll": "Baci opet",
@@ -64,9 +64,9 @@
   "zamjenaNoFigs": "Nema slobodnih figurica za zamjenu.",
   "zamjenaFig": "Figurica",
   "zamjenaSkip": "Preskoči",
-  "zamjenaOwnField": "Ovo je tvoje vlastito polje ZAMJENA — nema efekta.",
+  "zamjenaOwnField": "Ovo je tvoje vlastito polje ZAMJENA - nema efekta.",
 
-  "mostCannotPlace": "MOST nije moguć — nema slobodnog paralelnog polja",
+  "mostCannotPlace": "MOST nije moguć - nema slobodnog paralelnog polja",
   "mostCannotField": "MOST nije moguć na ovom polju",
 
   "pickupChoiceTitle": "Koje polje pokupiti?",
@@ -93,6 +93,8 @@
   "specialZamjenaRoll": "Baci kocku za odabir boje",
 
   "specialBombaMsg": "Bum! Tvoja figurica je otišla kući.",
+  "bombAlertTitle": "Bomba aktivirana!",
+  "bombAlertMsg": "Pomakni figuricu koja je aktivirala BOMBU ili će se ona vratiti u kučice HOME.",
   "specialStopMsg": "Stop! Figurica se može kretati samo za 1.",
   "specialRewindMsg": "Rewind! Sljedeći potez ide unazad.",
   "specialKockaMsg": "Kocka! Baci dvije kocke.",

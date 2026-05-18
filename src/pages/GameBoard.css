@@ -17,7 +17,7 @@
 }
 
 .game-turn-label {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 700;
   text-align: center;
   transition: color var(--transition);
@@ -43,15 +43,11 @@
 .game-timer-bar {
   height: 100%;
   background: var(--accent);
-  transition: width 1s linear, background-color 0.3s;
+  transition: width 1s linear;
+  transform-origin: left center;
 }
 
-.game-timer-bar--warning {
-  background: #fb8c00;
-}
-
-.game-timer-bar--urgent {
-  background: #e53935;
+.game-timer-bar--pulse {
   animation: pulse 0.6s ease-in-out infinite;
 }
 

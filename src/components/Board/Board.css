@@ -82,8 +82,8 @@
 }
 
 @keyframes center-die-pulse {
-  0%, 100% { filter: drop-shadow(0 0 3px var(--accent)); }
-  50%       { filter: drop-shadow(0 0 7px var(--accent)); }
+  0%, 100% { filter: drop-shadow(0 0 3px var(--player-color, var(--accent))); }
+  50%       { filter: drop-shadow(0 0 7px var(--player-color, var(--accent))); }
 }
 
 @keyframes center-die-spin {
@@ -256,6 +256,28 @@
   align-items: center;
   justify-content: center;
   z-index: 3;
+}
+
+/* SWAP placer-color halo — owner identification per rule 9.f.
+   Non-badge: idle cell after activator moves off — subtle tint + ring.
+   Badge: piece currently activating — solid placer-color dot, no border. */
+.special-icon--swap {
+  background: color-mix(in srgb, var(--placer-color) 32%, transparent);
+  border: 2px solid var(--placer-color);
+  border-radius: 50%;
+  width: calc(var(--bs) / 22);
+  height: calc(var(--bs) / 22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.special-icon--swap.special-icon--badge {
+  width: calc(var(--bs) / 28);
+  height: calc(var(--bs) / 28);
+  background: transparent;
+  border: none;
 }
 
 /* Finish slot number */

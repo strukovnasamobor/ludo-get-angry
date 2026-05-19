@@ -1,6 +1,5 @@
-- test game offline and online play and dark mode (PWA and in apk)
-
-Ver. 1.0.0 (1)
-- deploy and make TWA with PWA Web Builder
-- Google Play Store new edition
+- test game online play
 - change assetlinks.json
+
+CURRENT VERSION
+Ver. 1.0 (1)

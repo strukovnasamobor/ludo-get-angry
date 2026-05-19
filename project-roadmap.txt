@@ -1,5 +1,2 @@
-- test game online play
-- change assetlinks.json
-
 CURRENT VERSION
 Ver. 1.0.0 (1)

@@ -51,6 +51,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const autoAdvanceRef = useRef(null);
   const prevArmedKeyRef = useRef(null);
   const autoMoveAfterRollRef = useRef(false);
+  const autoSkipPlacingRef = useRef(false);
 
   useEffect(() => {
     if (!isMyTurn || !state.players?.length) { prevArmedKeyRef.current = null; return; }
@@ -104,6 +105,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     }
     else if (phase === 'moving') {
       if (validMoves.length > 0) {
+        autoSkipPlacingRef.current = true; // any auto-move should not pause to place a special
         const m = validMoves[Math.floor(Math.random() * validMoves.length)];
         selectMove(m);
       } else {
@@ -167,9 +169,20 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     if (phase !== 'moving') return;
     autoMoveAfterRollRef.current = false;
     if (validMoves.length === 0) { endTurn(); return; }
+    autoSkipPlacingRef.current = true; // auto-played turn never pauses on placement
     const m = validMoves[Math.floor(Math.random() * validMoves.length)];
     selectMove(m);
   }, [phase, validMoves, isMyTurn]);
+
+  // If the chain produced an auto-move that landed on a placement-eligible cell,
+  // skip the placement panel immediately instead of waiting another full timer.
+  useEffect(() => {
+    if (!isMyTurn) { autoSkipPlacingRef.current = false; return; }
+    if (!autoSkipPlacingRef.current) return;
+    if (phase !== 'placing-special') return;
+    autoSkipPlacingRef.current = false;
+    skipPlaceSpecial();
+  }, [phase, isMyTurn]);
 
   // Auto-dismiss "own zamjena" info after 2.5s
   useEffect(() => {
@@ -310,7 +323,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
             ❓
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
-            {theme === 'dark' ? '🌙' : '☀️'}
+            {theme === 'dark' ? '🌙' : '🔅'}
           </button>
         </div>
       </div>

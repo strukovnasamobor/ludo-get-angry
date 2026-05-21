@@ -16,7 +16,7 @@ export default function MainMenu() {
             📖
           </button>
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
-            {theme === 'dark' ? '🌙' : '☀️'}
+            {theme === 'dark' ? '🌙' : '🔅'}
           </button>
         </div>
       </div>

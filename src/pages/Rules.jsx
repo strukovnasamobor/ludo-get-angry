@@ -104,8 +104,8 @@ export function RulesContent({ lang }) {
       </Rule>
       <SubRule num="9.1.">
         {hr
-          ? 'Jednak broj svake vrste posebnih polja na početku igre se podijeli svakom igraču. Broj posebnih polja po igraču je cijeli broj koji se dobije dijeljenjem 8 s brojem igrača.'
-          : 'An equal number of each special type is distributed to every player at game start. The count per player equals the whole number result of dividing 8 by the number of players.'}
+          ? 'Ako je broj igrača jednak 4 ili manji tada svaki igrač dobiva 2 posebna polja svake vrste na početku igre, a ako j veći od 4 tada svaki igrač dobiva 1 posebno polje svake vrste.'
+          : 'If there are 4 or fewer players, each player starts with 2 of each type of special square. If there are more than 4 players, each player starts with 1 of each type of special square.'}
       </SubRule>
       <SubRule num="9.2.">
         {hr
@@ -153,7 +153,7 @@ export default function Rules() {
         <h2 className="rules-title">{t('rulesTitle')}</h2>
         <div className="setup-header-actions">
           <button className="btn btn-ghost menu-theme-btn" onClick={toggleTheme} aria-label="Toggle theme">
-            {theme === 'dark' ? '🌙' : '☀️'}
+            {theme === 'dark' ? '🌙' : '🔅'}
           </button>
         </div>
       </div>

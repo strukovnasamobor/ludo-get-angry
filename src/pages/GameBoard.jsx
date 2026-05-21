@@ -50,6 +50,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const [timeLeft, setTimeLeft] = useState(30);
   const autoAdvanceRef = useRef(null);
   const prevArmedKeyRef = useRef(null);
+  const autoMoveAfterRollRef = useRef(false);
 
   useEffect(() => {
     if (!isMyTurn || !state.players?.length) { prevArmedKeyRef.current = null; return; }
@@ -97,7 +98,18 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   autoAdvanceRef.current = () => {
     if (!isMyTurn) return;
     if (phase === 'placing-special') skipPlaceSpecial();
-    else if (phase === 'rolling' || phase === 'moving') endTurn();
+    else if (phase === 'rolling') {
+      autoMoveAfterRollRef.current = true; // chain: pick a move after the roll lands
+      rollDice();
+    }
+    else if (phase === 'moving') {
+      if (validMoves.length > 0) {
+        const m = validMoves[Math.floor(Math.random() * validMoves.length)];
+        selectMove(m);
+      } else {
+        endTurn();
+      }
+    }
     else if (phase === 'special-trigger') {
       const tr = state.specialTrigger;
       if (tr?.type === 'kocka' && tr.d1 == null) {
@@ -146,6 +158,18 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     const timer = setTimeout(endTurn, 1500);
     return () => clearTimeout(timer);
   }, [isNoMoves, endTurn]);
+
+  // Synthetic chain: after a timeout-triggered auto-roll lands in 'moving',
+  // pick a random valid move immediately so one timeout plays the whole turn.
+  useEffect(() => {
+    if (!isMyTurn) { autoMoveAfterRollRef.current = false; return; }
+    if (!autoMoveAfterRollRef.current) return;
+    if (phase !== 'moving') return;
+    autoMoveAfterRollRef.current = false;
+    if (validMoves.length === 0) { endTurn(); return; }
+    const m = validMoves[Math.floor(Math.random() * validMoves.length)];
+    selectMove(m);
+  }, [phase, validMoves, isMyTurn]);
 
   // Auto-dismiss "own zamjena" info after 2.5s
   useEffect(() => {
@@ -582,8 +606,9 @@ function ZamjenaStrip({ trigger, placer, eligibleFigs, players, isMyTurn, onSele
   );
 }
 
-function KockaModal({ t, trigger, onKockaSetRoll, onKocka, isMyTurn = true }) {
+function KockaModal({ t, trigger, players, onKockaSetRoll, onKocka, isMyTurn = true }) {
   const rolled = trigger.d1 != null;
+  const activeName = players?.find(p => p.color === trigger.playerColor)?.name || trigger.playerColor;
 
   // Once rolls are set in state (visible to all), active player resolves after a short delay
   useEffect(() => {
@@ -611,16 +636,21 @@ function KockaModal({ t, trigger, onKockaSetRoll, onKocka, isMyTurn = true }) {
           <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>=</span>
           <span style={{ color: 'var(--accent)' }}>{trigger.d1 + trigger.d2}</span>
         </div>
-      ) : (
-        <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRoll} disabled={!isMyTurn}>
+      ) : isMyTurn ? (
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleRoll}>
           🎲 🎲 {t('gameRoll')}
         </button>
+      ) : (
+        <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+          ⏳ {activeName} {t('waitingForPlayer')}
+        </p>
       )}
     </Modal>
   );
 }
 
-function SpecialModal({ trigger, t, isMyTurn = true, onMost, onKockaSetRoll, onKocka, onDismiss }) {
+function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSetRoll, onKocka, onDismiss }) {
+  const activeName = players?.find(p => p.color === trigger.playerColor)?.name || trigger.playerColor;
   if (trigger.type === 'stop') {
     return (
       <Modal title={`⏸️ ${t('specialStop')}`}>
@@ -652,14 +682,22 @@ function SpecialModal({ trigger, t, isMyTurn = true, onMost, onKockaSetRoll, onK
     return (
       <Modal title={`🌉 ${t('specialMost')}`}>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialMostQ')}</p>
-        <button className="btn btn-secondary" onClick={() => onMost(false)} disabled={!isMyTurn}>{t('specialMostStay')}</button>
-        <button className="btn btn-primary" onClick={() => onMost(true)} disabled={!isMyTurn}>{t('specialMostCross')}</button>
+        {isMyTurn ? (
+          <>
+            <button className="btn btn-secondary" onClick={() => onMost(false)}>{t('specialMostStay')}</button>
+            <button className="btn btn-primary" onClick={() => onMost(true)}>{t('specialMostCross')}</button>
+          </>
+        ) : (
+          <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+            ⏳ {activeName} {t('waitingForPlayer')}
+          </p>
+        )}
       </Modal>
     );
   }
 
   if (trigger.type === 'kocka') {
-    return <KockaModal key={`${trigger.ring}-${trigger.idx}`} t={t} trigger={trigger} onKockaSetRoll={onKockaSetRoll} onKocka={onKocka} isMyTurn={isMyTurn} />;
+    return <KockaModal key={`${trigger.ring}-${trigger.idx}`} t={t} trigger={trigger} players={players} onKockaSetRoll={onKockaSetRoll} onKocka={onKocka} isMyTurn={isMyTurn} />;
   }
 
   if (trigger.type === 'zamjena-own') {

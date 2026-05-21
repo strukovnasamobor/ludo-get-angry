@@ -181,9 +181,11 @@ export const GRID = buildGrid();
 // Special square types
 export const SPECIAL_TYPES = ['most', 'kocka', 'rewind', 'bomba', 'stop', 'zamjena'];
 
-// Distribute specials: floor(8 / numPlayers) of each type per player
+// Distribute specials (rule 9.1):
+//   2–4 players → 2 of each type per player
+//   5–8 players → 1 of each type per player
 export function distributeSpecials(numPlayers) {
-  const perPlayer = Math.floor(8 / numPlayers);
+  const perPlayer = numPlayers <= 4 ? 2 : 1;
   const hand = [];
   SPECIAL_TYPES.forEach(type => {
     for (let i = 0; i < perPlayer; i++) hand.push(type);

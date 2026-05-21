@@ -134,14 +134,15 @@ export function getValidMoves(state, diceVal) {
 
     if (fig.pos === 'home') {
       if (diceVal === 6) {
-        // Can exit to outer or inner ring
+        // Can exit to outer or inner ring; opponent on exit cell triggers a duel,
+        // only own piece blocks the exit.
         const pd = playerDef(player.color);
         const outerOcc = findFigureOnCell(state.players, 'outer', pd.exitOuter);
-        if (!outerOcc) {
+        if (!outerOcc || outerOcc.player.color !== player.color) {
           moves.push({ figId: fig.id, type: 'exit', ring: 'outer', idx: pd.exitOuter });
         }
         const innerOcc = findFigureOnCell(state.players, 'inner', pd.exitInner);
-        if (!innerOcc) {
+        if (!innerOcc || innerOcc.player.color !== player.color) {
           moves.push({ figId: fig.id, type: 'exit', ring: 'inner', idx: pd.exitInner });
         }
       }
@@ -424,9 +425,13 @@ function afterMove(state, move, preMoveSpecials = null) {
   const spKey = `${move.ring}-${move.idx}`;
   const activeColors = state.players.map(p => p.color);
   // Rule 9.2: no special — BRIDGE included — may be placed on a HOME-exit cell.
+  // Bridge endpoints occupy BOTH the placed-on cell and its parallel cell.
+  const parallel = move.ring ? getBridgeParallel(move.ring, move.idx) : null;
+  const parallelHasBridge = parallel && !!state.bridgesOnBoard[`${parallel.ring}-${parallel.idx}`];
   const validPlacement = (move.type === 'move' || move.type === 'exit') &&
     !state.specialsOnBoard[spKey] &&
     !state.bridgesOnBoard[spKey] &&
+    !parallelHasBridge &&
     hasSpecials &&
     canPlaceSpecial(move.ring, move.idx, activeColors);
 

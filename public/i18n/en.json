@@ -55,6 +55,7 @@
   "initialRollBtn": "roll!",
   "initialRollReroll": "Roll again",
   "waitingForHost": "Waiting for host…",
+  "waitingForPlayer": "is deciding…",
 
   "ok": "OK",
   "duelVs": "vs",

@@ -1,8 +1,16 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "hr.strukovnasamobor.ludo_get_angry",
-        "sha256_cert_fingerprints": ["DE:D8:22:0A:57:23:98:94:BF:8B:A7:FB:47:A0:9D:98:CE:70:81:0E:E5:5C:4C:99:FB:E7:EE:0B:60:87:D7:19"]
-      }
-    }]
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "hr.strukovnasamobor.ludo_get_angry",
+      "sha256_cert_fingerprints": [
+        "DE:D8:22:0A:57:23:98:94:BF:8B:A7:FB:47:A0:9D:98:CE:70:81:0E:E5:5C:4C:99:FB:E7:EE:0B:60:87:D7:19",
+        "29:7C:79:99:09:BD:EF:4E:A8:C1:41:78:BB:85:EE:2A:40:D1:01:D4:E7:9C:F0:2B:04:8B:FB:13:7F:41:BB:4C"
+      ]
+    }
+  }
+]

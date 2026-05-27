@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ludo Get Angry</string>
+    <string name="title_activity_main">Ludo Get Angry</string>
+    <string name="package_name">hr.strukovnasamobor.ludo_get_angry</string>
+    <string name="custom_url_scheme">hr.strukovnasamobor.ludo_get_angry</string>
+</resources>

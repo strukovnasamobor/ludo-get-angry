@@ -1,0 +1,21 @@
+{
+  "appId": "hr.strukovnasamobor.ludo_get_angry",
+  "appName": "Ludo Get Angry",
+  "webDir": "dist",
+  "server": {
+    "url": "https://ludo-get-angry.web.app",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "path": "android-capacitor"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    }
+  }
+}

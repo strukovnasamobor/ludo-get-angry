@@ -7,8 +7,12 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, googleProvider, GOOGLE_CLIENT_ID } from '../../firebase';
 import { promptOneTap as gisPromptOneTap, disableOneTapAutoSelect } from '../lib/googleOneTap';
+
+const IS_NATIVE = Capacitor.isNativePlatform();
 
 const AuthContext = createContext(null);
 
@@ -67,9 +71,33 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function signInWithGoogleNative() {
+    try {
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      const idToken = result?.credential?.idToken;
+      if (!idToken) throw new Error('native: no idToken returned');
+      const cred = GoogleAuthProvider.credential(idToken);
+      const userCred = await signInWithCredential(auth, cred);
+      if (!isAllowedEmail(userCred.user.email)) {
+        await signOut(auth);
+        try { await FirebaseAuthentication.signOut(); } catch (_) {}
+        throw new Error(NOT_ALLOWED_MSG);
+      }
+    } catch (err) {
+      const msg = err?.code || err?.message || '';
+      if (typeof msg === 'string' && /cancel/i.test(msg)) return;
+      throw err;
+    }
+  }
+
   async function signInWithGoogle() {
     if (auth.currentUser) return;
     setRedirectError('');
+
+    if (IS_NATIVE) {
+      await signInWithGoogleNative();
+      return;
+    }
 
     const r = await promptOneTap();
     if (r === 'success') return;
@@ -95,6 +123,9 @@ export function AuthProvider({ children }) {
   async function signOutUser() {
     await signOut(auth);
     disableOneTapAutoSelect();
+    if (IS_NATIVE) {
+      try { await FirebaseAuthentication.signOut(); } catch (_) {}
+    }
   }
 
   async function updateDisplayName(name) {

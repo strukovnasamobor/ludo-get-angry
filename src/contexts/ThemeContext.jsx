@@ -7,6 +7,7 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
+    document.documentElement.style.colorScheme = theme;
     localStorage.setItem('theme', theme);
   }, [theme]);
 

@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "1080158427010",
+    "project_id": "ludo-get-angry",
+    "storage_bucket": "ludo-get-angry.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1080158427010:android:d6dff45ccb9e268c98219b",
+        "android_client_info": {
+          "package_name": "hr.strukovnasamobor.ludo_get_angry"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1080158427010-dp583oqb2dm7fq3gu1e3hcrbdk1boomf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "hr.strukovnasamobor.ludo_get_angry",
+            "certificate_hash": "40b00e606a110d468f335b9bbd57d6fcff30da2a"
+          }
+        },
+        {
+          "client_id": "1080158427010-s345h2h6gel45hidd1ej793hme12qn6r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "hr.strukovnasamobor.ludo_get_angry",
+            "certificate_hash": "9cb3a93fcc836946c0f1b20a5bd19c0051770303"
+          }
+        },
+        {
+          "client_id": "1080158427010-q8qjqr6vu922gea8vjoidcifpod44vd6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2kroo5mNtPxbnZrz-lZoH7yP_g58YUwc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1080158427010-q8qjqr6vu922gea8vjoidcifpod44vd6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

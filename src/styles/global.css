@@ -16,6 +16,8 @@ html, body {
   transition: background-color var(--transition), color var(--transition);
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
+  forced-color-adjust: none;
+  -webkit-forced-color-adjust: none;
 }
 
 #root {

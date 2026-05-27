@@ -20,12 +20,13 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-// Initialize App Check with reCAPTCHA v3
-self.FIREBASE_APPCHECK_DEBUG_TOKEN = false; // Set to false in production
-initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_SITE_KEY'),
-  isTokenAutoRefreshEnabled: true
-});
+// App Check: web uses reCAPTCHA v3, native uses Play Integrity (initialized in main.jsx).
+if (!Capacitor.isNativePlatform()) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_SITE_KEY'),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })

@@ -1,6 +1,2 @@
-- test dark mode and sign in signed apk
-- add SHA codes from google play console to Firebase Console → App Check → Apps
-- objava nove verzije na Google Playu
-
 CURRENT VERSION
 Ver. 1.0.1 (2)

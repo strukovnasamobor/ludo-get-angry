@@ -13,6 +13,13 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Force black system bars on Android 15+ where the OS no longer paints
+             them. windowBackground shows in the WebView-inset areas (status bar
+             top, nav bar bottom). light* = false makes bar icons render light
+             so they stay visible on black. -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
 

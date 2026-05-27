@@ -11,9 +11,12 @@ html, body {
   overflow: hidden;
   overscroll-behavior: none;
   font-family: var(--font-main);
-  background-color: var(--bg-primary);
+  /* Black underlay for Chrome on Android's nav-bar tint sampling. The visible
+     game UI sits inside #root > .page which paints its own gradient + image
+     on top, so this only affects what Chrome samples at the viewport edge. */
+  background-color: #000000;
   color: var(--text-primary);
-  transition: background-color var(--transition), color var(--transition);
+  transition: color var(--transition);
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   forced-color-adjust: none;

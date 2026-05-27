@@ -17,7 +17,7 @@ export default defineConfig({
         id: "hr.strukovnasamobor.ludo_get_angry",
         name: 'Ludo Get Angry',
         short_name: 'Ludo Get Angry',
-        theme_color: '#1a1a2e',
+        theme_color: '#000000',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

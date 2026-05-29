@@ -93,7 +93,7 @@
   "specialZamjenaTitle": "Swap piece",
   "specialZamjenaRoll": "Roll dice to choose color",
 
-  "specialBombaMsg": "Boom! Your piece went home.",
+  "specialBombaMsg": "Boom! The piece went home.",
   "bombAlertTitle": "Bomb armed!",
   "bombAlertMsg": "Move the piece that has activated the BOMB or it will return to HOME.",
   "specialStopMsg": "Stop! Piece can only move by 1.",

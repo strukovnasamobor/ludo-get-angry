@@ -638,8 +638,21 @@ function KockaModal({ t, trigger, players, onKockaSetRoll, onKocka, isMyTurn = t
     );
   }
 
+  const ownerLine = (
+    <p style={{
+      textAlign: 'center',
+      fontWeight: 700,
+      fontSize: '0.95rem',
+      color: COLOR_HEX[trigger.playerColor],
+      margin: 0,
+    }}>
+      ● {activeName}
+    </p>
+  );
+
   return (
     <Modal title={`🎲 ${t('specialKocka')}`}>
+      {ownerLine}
       <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialKockaMsg')}</p>
       {rolled ? (
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center', fontSize: '1.4rem', fontWeight: 900, margin: '8px 0' }}>
@@ -664,9 +677,22 @@ function KockaModal({ t, trigger, players, onKockaSetRoll, onKocka, isMyTurn = t
 
 function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSetRoll, onKocka, onDismiss }) {
   const activeName = players?.find(p => p.color === trigger.playerColor)?.name || trigger.playerColor;
+  const ownerLine = (
+    <p style={{
+      textAlign: 'center',
+      fontWeight: 700,
+      fontSize: '0.95rem',
+      color: COLOR_HEX[trigger.playerColor],
+      margin: 0,
+    }}>
+      ● {activeName}
+    </p>
+  );
+
   if (trigger.type === 'stop') {
     return (
       <Modal title={`⏸️ ${t('specialStop')}`}>
+        {ownerLine}
         <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('specialStopMsg')}</p>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={onDismiss} disabled={!isMyTurn}>{t('ok')}</button>
       </Modal>
@@ -676,6 +702,7 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
   if (trigger.type === 'rewind') {
     return (
       <Modal title={`⏪ ${t('specialRewind')}`}>
+        {ownerLine}
         <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('specialRewindMsg')}</p>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={onDismiss} disabled={!isMyTurn}>{t('ok')}</button>
       </Modal>
@@ -685,6 +712,7 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
   if (trigger.type === 'bomba') {
     return (
       <Modal title={`💣 ${t('specialBomba')}`}>
+        {ownerLine}
         <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('specialBombaMsg')}</p>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={onDismiss} disabled={!isMyTurn}>{t('ok')}</button>
       </Modal>
@@ -694,6 +722,7 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
   if (trigger.type === 'most') {
     return (
       <Modal title={`🌉 ${t('specialMost')}`}>
+        {ownerLine}
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialMostQ')}</p>
         {isMyTurn ? (
           <>
@@ -716,6 +745,7 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
   if (trigger.type === 'zamjena-own') {
     return (
       <Modal title={`🔄 ${t('specialZamjena')}`}>
+        {ownerLine}
         <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('zamjenaOwnField')}</p>
       </Modal>
     );

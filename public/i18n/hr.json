@@ -93,7 +93,7 @@
   "specialZamjenaTitle": "Zamjena figurice",
   "specialZamjenaRoll": "Baci kocku za odabir boje",
 
-  "specialBombaMsg": "Bum! Tvoja figurica je otišla kući.",
+  "specialBombaMsg": "Bum! Figurica je otišla kući.",
   "bombAlertTitle": "Bomba aktivirana!",
   "bombAlertMsg": "Pomakni figuricu koja je aktivirala BOMBU ili će se ona vratiti u kučice HOME.",
   "specialStopMsg": "Stop! Figurica se može kretati samo za 1.",

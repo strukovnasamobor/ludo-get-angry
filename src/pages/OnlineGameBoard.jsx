@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,7 +7,7 @@ import { useOnlineGame } from '../hooks/useOnlineGame';
 import GameBoard from './GameBoard';
 
 const HEARTBEAT_INTERVAL = 10_000; // write presence every 10s
-const STALE_THRESHOLD    = 30_000; // player considered gone after 30s without heartbeat
+const STALE_THRESHOLD    = 90_000; // player considered gone after 90s without heartbeat
 
 export default function OnlineGameBoard() {
   const { roomId } = useParams();
@@ -39,9 +39,6 @@ export default function OnlineGameBoard() {
 }
 
 function OnlineGameBoardInner({ room, roomId, myUid }) {
-  const roomRef = useRef(room);
-  useEffect(() => { roomRef.current = room; }, [room]);
-
   // ── Presence: write heartbeat every 10s so others can detect disconnect ──
   useEffect(() => {
     const writePresence = () =>
@@ -62,27 +59,9 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     };
   }, []);
 
-  // ── Cleanup: remove self from room.players on unmount / pagehide ──
-  useEffect(() => {
-    const doLeave = () => {
-      const r = roomRef.current;
-      if (!r) return;
-      const remaining = r.players.filter(p => p.uid !== myUid);
-      const updates = {
-        players: remaining,
-        playerUids: remaining.map(p => p.uid),
-        updatedAt: serverTimestamp(),
-      };
-      if (r.hostUid === myUid && remaining.length > 0) updates.hostUid = remaining[0].uid;
-      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
-    };
-
-    window.addEventListener('pagehide', doLeave);
-    return () => {
-      doLeave();
-      window.removeEventListener('pagehide', doLeave);
-    };
-  }, []);
+  // No active-game unmount cleanup: closing the tab leaves the player's seat
+  // intact so they can rejoin seamlessly. Stale-presence (above) is the sole
+  // removal mechanism once a heartbeat is >90s old.
 
   const setupPlayers = room.players.map(p => ({
     color: p.color,

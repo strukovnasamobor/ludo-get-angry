@@ -38,7 +38,7 @@ service cloud.firestore {
       function sizeOk() {
         return incoming().players is list
           && incoming().playerUids is list
-          && incoming().players.size() <= 4
+          && incoming().players.size() <= 8
           && incoming().playerUids.size() == incoming().players.size();
       }
 

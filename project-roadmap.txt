@@ -1,6 +1,2 @@
-- online igra zašto je ograničena na 4 igrača
-- kada igrač izađe i ponovno uđe igra počinje ispočetka (testirati za guest i host)
-- poruke kad se ispisuje napisati figurica čijeg igrača se to dogodilo
-
 CURRENT VERSION
 Ver. 1.0.1 (2)

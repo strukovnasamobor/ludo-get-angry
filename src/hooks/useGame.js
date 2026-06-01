@@ -29,6 +29,7 @@ function initState(setupPlayers) {
       uid: sp.uid ?? null,
       figures: initFigures(),
       specialsHeld: distributeSpecials(setupPlayers.length),
+      skipCount: 0,
     })),
     currentPlayerIndex: 0,
     diceValue: null,
@@ -155,12 +156,13 @@ export function getValidMoves(state, diceVal) {
       const pd = playerDef(player.color);
 
       if (fig.rewindNext) {
-        let targetIdx = advanceCCW(idx, diceVal, len);
-        if (ring === 'inner') {
-          // Clamp backward move at the exit point — can't rewind past spawn
-          const stepsBackToExit = (idx - pd.exitInner + len) % len;
-          if (stepsBackToExit < diceVal) targetIdx = pd.exitInner;
-        }
+        // Rule 9.c: a rewinding piece may NOT pass its own exit cell on the
+        // current ring. If the dice value would land beyond the exit, the
+        // move is illegal — don't surface it as a valid option.
+        const exitIdx = ring === 'inner' ? pd.exitInner : pd.exitOuter;
+        const stepsBackToExit = (idx - exitIdx + len) % len;
+        if (diceVal > stepsBackToExit) return; // illegal — past own exit
+        const targetIdx = advanceCCW(idx, diceVal, len);
         if (!findFigureOnCell(state.players, ring, targetIdx)) {
           moves.push({ figId: fig.id, type: 'move', ring, idx: targetIdx, rewind: true });
         }
@@ -185,7 +187,13 @@ export function getValidMoves(state, diceVal) {
           // else overshoot (slot > 4) — no valid move
         }
       } else {
-        // Outer ring: loop indefinitely, no finish access
+        // Outer ring (rule 5): piece must stop BEFORE its own exit cell.
+        // It can never land on or pass through its own exit on the way clockwise.
+        // stepsToExit = how many cells clockwise until landing on exitOuter.
+        // If currently AT the exit (just spawned), allow a full lap minus one.
+        let stepsToExit = (pd.exitOuter - idx + len) % len;
+        if (stepsToExit === 0) stepsToExit = len;
+        if (diceVal >= stepsToExit) return; // would land on or pass the exit — illegal
         const targetIdx = advanceCW(idx, diceVal, len);
         const occupant = findFigureOnCell(state.players, ring, targetIdx);
         if (!occupant || occupant.player.color !== player.color) {
@@ -604,6 +612,12 @@ function applyDuelResolve(state, atkRoll, defRoll) {
 function reducer(state, action) {
   switch (action.type) {
     case 'ROLL_DICE': {
+      // Rolling counts as an active turn — reset any pending skip-warning.
+      if (state.players[state.currentPlayerIndex]?.skipCount) {
+        state = { ...state, players: state.players.map((p, i) =>
+          i === state.currentPlayerIndex ? { ...p, skipCount: 0 } : p
+        ) };
+      }
       const val = rollD6();
       const player = state.players[state.currentPlayerIndex];
       const stuck = isAllStuck(player);
@@ -743,6 +757,19 @@ function reducer(state, action) {
       const { who, roll } = action;
       if (!state.duelState) return state;
       return { ...state, duelState: { ...state.duelState, [who === 'atk' ? 'atkRoll' : 'defRoll']: roll } };
+    }
+
+    case 'FORCE_DUEL_TIMEOUT': {
+      // Timer expired with at least one missing roll.
+      // Rule: a side that didn't roll forfeits. If neither rolled, attacker wins.
+      if (!state.duelState) return state;
+      const ds = state.duelState;
+      if (ds.atkRoll !== null && ds.defRoll !== null) return state; // both rolled — race guard
+      const atkWins = ds.atkRoll !== null || ds.defRoll === null;
+      // Synthesize rolls so applyDuelResolve drives the right winner.
+      const fakeAtk = atkWins ? 6 : 1;
+      const fakeDef = atkWins ? 1 : 6;
+      return applyDuelResolve(state, fakeAtk, fakeDef);
     }
 
     case 'RESOLVE_MOST': {
@@ -907,10 +934,30 @@ function reducer(state, action) {
       return advanceTurn(state);
     }
 
+    case 'SKIP_PLAYER_TURN': {
+      // Skip the absent active player. Carries `color` so out-of-date clients
+      // can no-op when another client already advanced the turn.
+      const { color } = action;
+      const idx = state.currentPlayerIndex;
+      const current = state.players[idx];
+      if (!current || current.color !== color) return state;
+      const players = state.players.map((p, i) =>
+        i === idx ? { ...p, skipCount: (p.skipCount ?? 0) + 1 } : p
+      );
+      return advanceTurn({ ...state, players });
+    }
+
     case 'INITIAL_ROLL': {
       const { initialRollOrder, initialRollIdx, initialRolls } = state;
       if (initialRollIdx >= initialRollOrder.length) return state;
       const color = initialRollOrder[initialRollIdx];
+      // Rolling is activity — reset any pending skip-warning for this player.
+      const rollerIdx = state.players.findIndex(p => p.color === color);
+      if (rollerIdx >= 0 && state.players[rollerIdx]?.skipCount) {
+        state = { ...state, players: state.players.map((p, i) =>
+          i === rollerIdx ? { ...p, skipCount: 0 } : p
+        ) };
+      }
       const val = rollD6();
       const newRolls = { ...initialRolls, [color]: val };
       const nextIdx = initialRollIdx + 1;
@@ -1071,6 +1118,8 @@ export function useGame(setupPlayers) {
     dispatch({ type: 'RESOLVE_DUEL', atkRoll, defRoll }), []);
   const duelSetRoll = useCallback((who, roll) =>
     dispatch({ type: 'DUEL_SET_ROLL', who, roll }), []);
+  const forceDuelTimeout = useCallback(() =>
+    dispatch({ type: 'FORCE_DUEL_TIMEOUT' }), []);
   const resolveMost = useCallback((cross, trigger) =>
     dispatch({ type: 'RESOLVE_MOST', cross, trigger }), []);
   const resolveKocka = useCallback((trigger, d1, d2) =>
@@ -1080,6 +1129,10 @@ export function useGame(setupPlayers) {
     dispatch({ type: 'RESOLVE_ZAMJENA', trigger, targetColor, targetFigId }), []);
   const dismissSpecialInfo = useCallback(() => dispatch({ type: 'DISMISS_SPECIAL_INFO' }), []);
   const endTurn = useCallback(() => dispatch({ type: 'END_TURN' }), []);
+  const skipPlayerTurn = useCallback((color) =>
+    dispatch({ type: 'SKIP_PLAYER_TURN', color }), []);
+  const removePlayer = useCallback((color) =>
+    dispatch({ type: 'REMOVE_PLAYER', color }), []);
   const initialRoll = useCallback(() => dispatch({ type: 'INITIAL_ROLL' }), []);
   const continueAfterTie = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame = useCallback(() => dispatch({ type: 'START_GAME' }), []);
@@ -1100,12 +1153,15 @@ export function useGame(setupPlayers) {
     placeSpecial,
     resolveDuel,
     duelSetRoll,
+    forceDuelTimeout,
     resolveMost,
     resolveKocka,
     kockaSetRoll,
     resolveZamjena,
     dismissSpecialInfo,
     endTurn,
+    skipPlayerTurn,
+    removePlayer,
     initialRoll,
     continueAfterTie,
     startGame,

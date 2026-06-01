@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useOnlineGame } from '../hooks/useOnlineGame';
 import GameBoard from './GameBoard';
+import Modal from '../components/Modal.jsx';
 
-const HEARTBEAT_INTERVAL = 10_000; // write presence every 10s
-const STALE_THRESHOLD    = 90_000; // player considered gone after 90s without heartbeat
+const HEARTBEAT_INTERVAL = 30_000; // write presence every 30s
+const ACTIVE_STALE_MS    = 60_000; // active player stalls turn after 2 missed beats
+const STALE_THRESHOLD    = 90_000; // any player kicked after this (safety net)
 
 export default function OnlineGameBoard() {
   const { roomId } = useParams();
@@ -39,7 +42,11 @@ export default function OnlineGameBoard() {
 }
 
 function OnlineGameBoardInner({ room, roomId, myUid }) {
-  // ── Presence: write heartbeat every 10s so others can detect disconnect ──
+  const { t } = useLanguage();
+  const [showSkipWarning, setShowSkipWarning] = useState(false);
+  const prevSkipTurnKeyRef = useRef(null);
+
+  // ── Presence: write heartbeat every 30s so others can detect disconnect ──
   useEffect(() => {
     const writePresence = () =>
       updateDoc(doc(db, 'rooms', roomId), {
@@ -69,7 +76,28 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     uid: p.uid,
   }));
 
-  const gameHook = useOnlineGame(setupPlayers, roomId, room.players);
+  const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState);
+
+  // ── Kick watcher: when any player's skipCount reaches 2 in gameState
+  //    (set by present-but-idle self-skip via autoAdvance, or by the active-stale
+  //    detector below), remove them from room.players. This cascades through
+  //    the REMOVE_PLAYER reducer which eliminates their pieces, specials,
+  //    bridges, and transfers host if needed. Multiple clients may write
+  //    simultaneously — Firestore's last-write-wins makes it idempotent. ──
+  useEffect(() => {
+    const target = gameHook.state.players.find(p => (p.skipCount ?? 0) >= 2);
+    if (!target?.uid) return;
+    const remaining = room.players.filter(p => p.uid !== target.uid);
+    const updates = {
+      players: remaining,
+      playerUids: remaining.map(p => p.uid),
+      updatedAt: serverTimestamp(),
+    };
+    if (room.hostUid === target.uid && remaining.length > 0) {
+      updates.hostUid = remaining[0].uid;
+    }
+    updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
+  }, [gameHook.state.players, room.players, room.hostUid, roomId]);
 
   // ── Stale-presence detection: if another player stopped sending heartbeats,
   //    remove them from room.players so the existing REMOVE_PLAYER path fires. ──
@@ -100,6 +128,48 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     }
   }, [room.presence, gameHook.state.players, gameHook.state.phase]);
 
+  // ── Active-player stale detection: skip them after ACTIVE_STALE_MS;
+  //    kick them on a 2nd consecutive skip. Reuses REMOVE_PLAYER path. ──
+  useEffect(() => {
+    const phase = gameHook.state.phase;
+    if (phase === 'game-over' || phase === 'initial-roll') return;
+    if (!room.presence) return;
+    const active = gameHook.state.players[gameHook.state.currentPlayerIndex];
+    if (!active?.uid || active.uid === myUid) return;
+    const lastSeen = room.presence[active.uid]?.toMillis?.();
+    if (!lastSeen) return;
+    if (Date.now() - lastSeen <= ACTIVE_STALE_MS) return;
+
+    if ((active.skipCount ?? 0) >= 1) {
+      // Second consecutive skip — kick.
+      const remaining = room.players.filter(p => p.uid !== active.uid);
+      const updates = {
+        players: remaining,
+        playerUids: remaining.map(p => p.uid),
+        updatedAt: serverTimestamp(),
+      };
+      if (room.hostUid === active.uid && remaining.length > 0) {
+        updates.hostUid = remaining[0].uid;
+      }
+      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
+    } else {
+      gameHook.skipPlayerTurn(active.color);
+    }
+  }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players]);
+
+  // ── Skip-warning: when it's my turn and my skipCount > 0 (I missed last
+  //    turn), show a one-time modal so I know I'm one skip away from a kick. ──
+  useEffect(() => {
+    const me = gameHook.state.players.find(p => p.uid === myUid);
+    if (!me) { prevSkipTurnKeyRef.current = null; return; }
+    const myTurn = gameHook.state.players[gameHook.state.currentPlayerIndex]?.uid === myUid;
+    if (!myTurn) { prevSkipTurnKeyRef.current = null; return; }
+    if ((me.skipCount ?? 0) === 0) { prevSkipTurnKeyRef.current = null; return; }
+    const key = `${gameHook.state.currentPlayerIndex}-${me.skipCount}`;
+    if (key !== prevSkipTurnKeyRef.current) setShowSkipWarning(true);
+    prevSkipTurnKeyRef.current = key;
+  }, [gameHook.state.currentPlayerIndex, gameHook.state.players, myUid]);
+
   // Use game-state players (not room.players) so indices stay correct after removals
   const myColor = gameHook.state.players.find(p => p.uid === myUid)?.color;
   const isAdmin = myUid === room.hostUid;
@@ -112,5 +182,16 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     return gameHook.state.players[gameHook.state.currentPlayerIndex]?.uid === myUid;
   })();
 
-  return <GameBoard gameHook={gameHook} isMyTurn={isMyTurn} myPlayerColor={myColor} playAgainPath="/lobby" isHost={isAdmin} />;
+  return (
+    <>
+      <GameBoard gameHook={gameHook} isMyTurn={isMyTurn} myPlayerColor={myColor} playAgainPath="/lobby" isHost={isAdmin} />
+      {showSkipWarning && (
+        <Modal title={t('skipWarningTitle')} onClose={() => setShowSkipWarning(false)}>
+          <p style={{ textAlign: 'center', fontSize: '2rem' }}>⏳</p>
+          <p style={{ textAlign: 'center' }}>{t('skipWarningMsg')}</p>
+          <button className="btn btn-primary" onClick={() => setShowSkipWarning(false)}>{t('ok')}</button>
+        </Modal>
+      )}
+    </>
+  );
 }

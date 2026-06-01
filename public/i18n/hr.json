@@ -33,8 +33,8 @@
   "gameRollsLeft": "Bacanja preostalo",
   "gameNoMoves": "Nema mogućih poteza",
   "gameChooseExit": "Odaberi izlaz",
-  "gameOuterRing": "Vanjski prsten (dulja ruta)",
-  "gameInnerRing": "Unutarnji prsten (kraća ruta)",
+  "gameOuterRing": "Vanjski krug (dulja ruta)",
+  "gameInnerRing": "Unutarnji krug (kraća ruta)",
   "gamePlaceSpecial": "Postavi posebno polje",
   "gameSkip": "Preskoči postavljanje",
   "gameWin": "Pobijedio!",
@@ -144,5 +144,7 @@
   "exitConfirmYes": "Izlaz",
   "exitConfirmNo": "Nastavi igru",
 
-  "onlineNotYourTurn": "Čekaj na svoj potez"
+  "onlineNotYourTurn": "Čekaj na svoj potez",
+  "skipWarningTitle": "Zadnje upozorenje",
+  "skipWarningMsg": "Propustio si zadnji potez. Odigraj ovaj ili ćeš biti uklonjen iz igre."
 }

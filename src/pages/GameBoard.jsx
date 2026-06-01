@@ -36,8 +36,8 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   const localHook = useGame(setup?.players || []);
   const { state, currentPlayer, validMoves, rollDice, selectMove,
-    skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
-    dismissSpecialInfo, endTurn, initialRoll, continueAfterTie, startGame,
+    skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
+    dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
   } = gameHook ?? localHook;
 
   const { containerRef: boardAreaRef, transform: boardTransform } = usePinchZoom();
@@ -50,7 +50,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const [timeLeft, setTimeLeft] = useState(30);
   const autoAdvanceRef = useRef(null);
   const prevArmedKeyRef = useRef(null);
-  const autoMoveAfterRollRef = useRef(false);
   const autoSkipPlacingRef = useRef(false);
 
   useEffect(() => {
@@ -100,8 +99,8 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     if (!isMyTurn) return;
     if (phase === 'placing-special') skipPlaceSpecial();
     else if (phase === 'rolling') {
-      autoMoveAfterRollRef.current = true; // chain: pick a move after the roll lands
-      rollDice();
+      // Don't auto-roll: count this as a missed turn and skip.
+      skipPlayerTurn?.(currentPlayer.color);
     }
     else if (phase === 'moving') {
       if (validMoves.length > 0) {
@@ -127,14 +126,8 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         dismissSpecialInfo();
       }
     }
-    else if (phase === 'duel') {
-      const ds = state.duelState;
-      if (!ds) return;
-      const canRollAtk = (!myPlayerColor || myPlayerColor === ds.atkColor) && ds.atkRoll === null;
-      const canRollDef = (!myPlayerColor || myPlayerColor === ds.defColor) && ds.defRoll === null;
-      if (canRollAtk) duelSetRoll('atk', Math.floor(Math.random() * 6) + 1);
-      else if (canRollDef) duelSetRoll('def', Math.floor(Math.random() * 6) + 1);
-    }
+    // 'duel' phase is handled by a dedicated effect (runs on every client,
+    // not gated by isMyTurn) — see duel-timeout effect below.
   };
 
   // Reset and start 30s countdown whenever a meaningful state change occurs
@@ -161,20 +154,28 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     return () => clearTimeout(timer);
   }, [isNoMoves, endTurn]);
 
-  // Synthetic chain: after a timeout-triggered auto-roll lands in 'moving',
-  // pick a random valid move immediately so one timeout plays the whole turn.
+  // Offline kick: when a player's skipCount reaches 2 in local (hot-seat) play,
+  // remove them directly. Online play handles this via OnlineGameBoard's
+  // room.players write — gated below so this never double-fires online.
   useEffect(() => {
-    if (!isMyTurn) { autoMoveAfterRollRef.current = false; return; }
-    if (!autoMoveAfterRollRef.current) return;
-    if (phase !== 'moving') return;
-    autoMoveAfterRollRef.current = false;
-    if (validMoves.length === 0) { endTurn(); return; }
-    autoSkipPlacingRef.current = true; // auto-played turn never pauses on placement
-    const m = validMoves[Math.floor(Math.random() * validMoves.length)];
-    selectMove(m);
-  }, [phase, validMoves, isMyTurn]);
+    if (gameHook) return; // online uses room.players-write path
+    const target = state.players.find(p => (p.skipCount ?? 0) >= 2);
+    if (target?.color) removePlayer?.(target.color);
+  }, [state.players, gameHook]);
 
-  // If the chain produced an auto-move that landed on a placement-eligible cell,
+  // Duel timeout: ~30 s after the last duel state change with at least one
+  // roll missing, force-resolve per the rule. Runs on EVERY client (no
+  // isMyTurn gate) so the duel can resolve even if both sides go idle.
+  // Reducer's "both rolled → no-op" and "duelState missing → no-op" guards
+  // make multi-client races idempotent.
+  useEffect(() => {
+    if (phase !== 'duel' || !state.duelState) return;
+    if (!forceDuelTimeout) return;
+    const id = setTimeout(() => forceDuelTimeout(), 30_000);
+    return () => clearTimeout(id);
+  }, [phase, state.duelState?.atkRoll, state.duelState?.defRoll]);
+
+  // If an auto-move (from 'moving' timeout) lands on a placement-eligible cell,
   // skip the placement panel immediately instead of waiting another full timer.
   useEffect(() => {
     if (!isMyTurn) { autoSkipPlacingRef.current = false; return; }

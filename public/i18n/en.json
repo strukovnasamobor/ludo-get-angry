@@ -144,5 +144,7 @@
   "exitConfirmYes": "Exit",
   "exitConfirmNo": "Keep playing",
 
-  "onlineNotYourTurn": "Wait for your turn"
+  "onlineNotYourTurn": "Wait for your turn",
+  "skipWarningTitle": "Final warning",
+  "skipWarningMsg": "You missed your last turn. Play this one or you will be removed from the game."
 }

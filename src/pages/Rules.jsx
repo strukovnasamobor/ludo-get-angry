@@ -7,7 +7,7 @@ const SPECIALS = {
   hr: [
     { emoji: '🌉', name: 'MOST',    desc: 'Igrač čija je figurica aktivirala ili stala na MOST odlučuje hoće li figurica ostati ili s njom prelazi most.' },
     { emoji: '🎲', name: 'KOCKA',   desc: 'Igrač čija je figurica aktivirala ili stala na KOCKU baca dvije kocke i mora pokušati pomaknuti figuricu za dobiveni zbroj.' },
-    { emoji: '⏪', name: 'REWIND',  desc: 'Figurica koja je aktivirala ili stala na REWIND mora se kretati suprotno od kazaljke na satu na idućem potezu kada igrač odluči pomaknuti tu figuricu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom prstenu.' },
+    { emoji: '⏪', name: 'REWIND',  desc: 'Figurica koja je aktivirala ili stala na REWIND mora se kretati suprotno od kazaljke na satu na idućem potezu kada igrač odluči pomaknuti tu figuricu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom krugu.' },
     { emoji: '💣', name: 'BOMBA',   desc: 'Figurica koja je aktivirala BOMBU mora se pomaknuti na idućem potezu ili će biti vraćena u svoj kvadratić HOME. Figurica koja stane na BOMBU vraća se u svoj kvadratić HOME i igrač koji je stao na bombu uzima je u ruku za ponovno postavljanje.' },
     { emoji: '⏸️', name: 'STOP',    desc: 'Figurica koja je aktivirala ili stala na STOP smije se kretati samo za jedno polje kada se na kocki dobije broj jedan.' },
     { emoji: '🔄', name: 'ZAMJENA', desc: 'Igrač ćija je figurica stala na ZAMJENU bira slobodnu figuricu (izvan kvadratića HOME i FINISH) boje igrača koji je postavio to "posebno polje". Ako nema slobodnih figurica te boje zamjena se ne izvršava.' },
@@ -79,8 +79,8 @@ export function RulesContent({ lang }) {
       </Rule>
       <Rule num="5.">
         {hr
-          ? 'Svako polje na mapi se broji kao jedan. Čitav broj dobiven na kocki mora se iskoristiti za jednu figuricu za kretanje po mapi u smjeru kazaljke na satu do polja neposredno prije izlaska za igrača te boje u unutarnjem krugu. U vanjskom krugu, figurica može nastaviti kretanje kontinuirano. Ako nema mogućih ispravnih poteza tada je na redu idući igrač.'
-          : 'Every square counts as one step. The full dice value must be used for a single piece moving clockwise, stopping before the color\'s own finish entry in inner ring. In outer ring, the piece may continue moving continuously. If no valid move exists, the next player takes their turn.'}
+          ? 'Svako polje broji kao jedan. Pomakni jednu figuricu u smjeru kazaljke na satu za cijeli broj s kocke. U unutarnjem krugu figurica može ući u svoje FINISH polje (1–4) ako točnim brojem stane na slobodno polje, inače staje prije svojeg izlaska iz kuće. U vanjskom krugu figurica staje prije svojeg izlaska iz kuće i može doći do FINISH-a samo preko MOSTA na unutarnji krug. Ako nema mogućeg poteza, na redu je sljedeći igrač.'
+          : 'Every square counts as one step. Move one piece clockwise by the full dice value. In the inner ring, a piece may enter its own FINISH slot (1–4) if the exact roll lands it on an empty slot; otherwise it stops before its own home exit. In the outer ring, a piece stops before its own home exit and must cross a BRIDGE to reach FINISH. If no valid move exists, the next player takes their turn.'}
       </Rule>
       <Rule num="6.">
         {hr

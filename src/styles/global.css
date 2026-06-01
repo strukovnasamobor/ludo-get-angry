@@ -79,6 +79,18 @@ button {
   transform: scale(0.96);
 }
 
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.btn:disabled:active,
+.btn[disabled]:active {
+  transform: none;
+}
+
 .btn-primary {
   background-color: var(--accent);
   color: var(--text-on-accent);

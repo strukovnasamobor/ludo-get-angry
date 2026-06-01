@@ -3,9 +3,18 @@ import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase';
 import { reducer, initState, getValidMoves } from './useGame';
 
-export function useOnlineGame(setupPlayers, roomId, roomPlayers) {
-  const [state, dispatch] = useReducer(reducer, setupPlayers, initState);
-  const lastRemoteStateRef = useRef(null);
+export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameState) {
+  // Lazy-init from the remote gameState when it already exists (rejoin into
+  // a game in progress). Falls back to a fresh initial-roll state for brand-new
+  // rooms where nothing has been written yet.
+  const [state, dispatch] = useReducer(
+    reducer,
+    null,
+    () => initialGameState || initState(setupPlayers)
+  );
+  // Prime the last-known-remote with the seed we just used so the local→remote
+  // write effect doesn't immediately publish an unchanged state.
+  const lastRemoteStateRef = useRef(initialGameState ? JSON.stringify(initialGameState) : null);
   const prevRoomColorsRef = useRef(roomPlayers.map(p => p.color));
   const roomColorsKey = roomPlayers.map(p => p.color).join(',');
 
@@ -56,6 +65,8 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers) {
     dispatch({ type: 'RESOLVE_DUEL', atkRoll, defRoll }), []);
   const duelSetRoll        = useCallback((who, roll) =>
     dispatch({ type: 'DUEL_SET_ROLL', who, roll }), []);
+  const forceDuelTimeout   = useCallback(() =>
+    dispatch({ type: 'FORCE_DUEL_TIMEOUT' }), []);
   const resolveMost        = useCallback((cross, trigger) =>
     dispatch({ type: 'RESOLVE_MOST', cross, trigger }), []);
   const resolveKocka       = useCallback((trigger, d1, d2) =>
@@ -66,6 +77,7 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers) {
     dispatch({ type: 'RESOLVE_ZAMJENA', trigger, targetColor, targetFigId }), []);
   const dismissSpecialInfo = useCallback(() => dispatch({ type: 'DISMISS_SPECIAL_INFO' }), []);
   const endTurn            = useCallback(() => dispatch({ type: 'END_TURN' }), []);
+  const skipPlayerTurn     = useCallback((color) => dispatch({ type: 'SKIP_PLAYER_TURN', color }), []);
   const initialRoll        = useCallback(() => dispatch({ type: 'INITIAL_ROLL' }), []);
   const continueAfterTie   = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame          = useCallback(() => dispatch({ type: 'START_GAME' }), []);
@@ -76,7 +88,7 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers) {
   return {
     state, currentPlayer, validMoves,
     rollDice, selectMove, skipPlaceSpecial, placeSpecial,
-    resolveDuel, duelSetRoll, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
-    dismissSpecialInfo, endTurn, initialRoll, continueAfterTie, startGame,
+    resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
+    dismissSpecialInfo, endTurn, skipPlayerTurn, initialRoll, continueAfterTie, startGame,
   };
 }

@@ -4,6 +4,9 @@
   overflow: hidden;
   height: 100%;
   background: var(--bg-primary);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .game-topbar {

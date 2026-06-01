@@ -198,23 +198,15 @@
 .figure--moveable {
   cursor: pointer;
   animation: pulse 1s ease-in-out infinite;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(33, 150, 243, 0.9);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--figure-color, rgba(33, 150, 243, 0.9));
 }
 
-.figure--stop {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(229, 57, 53, 0.9);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-.figure--rewind {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(229, 57, 53, 0.9);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-.figure--bomb {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(229, 57, 53, 0.9);
-  animation: pulse 0.7s ease-in-out infinite;
-}
+/* Special-state pieces (STOP/REWIND/BOMB) have no on-board visual ring or
+   animation in any turn — the only highlight is the moveable ring (which
+   already covers "can I move this piece?"). Status emoji still appears in
+   the piece's hover tooltip for identification. */
 
 /* Spawn point arrow */
 .spawn-arrow {
@@ -261,21 +253,23 @@
 /* SWAP placer-color halo — owner identification per rule 9.f.
    Non-badge: idle cell after activator moves off — subtle tint + ring.
    Badge: piece currently activating — solid placer-color dot, no border. */
+/* SWAP icon — sized to roughly match the other special emojis' glyph
+   footprint (they sit at font-size = bs/38). The inline SVG fills the box
+   and provides its own placer-color background + white arrows. */
 .special-icon--swap {
-  background: color-mix(in srgb, var(--placer-color) 32%, transparent);
-  border: 2px solid var(--placer-color);
-  border-radius: 50%;
-  width: calc(var(--bs) / 22);
-  height: calc(var(--bs) / 22);
+  width: calc(var(--bs) / 36);
+  height: calc(var(--bs) / 36);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .special-icon--swap.special-icon--badge {
-  width: calc(var(--bs) / 28);
-  height: calc(var(--bs) / 28);
+  width: calc(var(--bs) / 50);
+  height: calc(var(--bs) / 50);
   background: transparent;
   border: none;
 }

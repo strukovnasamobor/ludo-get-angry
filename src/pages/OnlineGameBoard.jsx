@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useOnlineGame } from '../hooks/useOnlineGame';
 import GameBoard from './GameBoard';
-import Modal from '../components/Modal.jsx';
 
 const HEARTBEAT_INTERVAL = 30_000; // write presence every 30s
 const ACTIVE_STALE_MS    = 60_000; // active player stalls turn after 2 missed beats
@@ -42,10 +40,6 @@ export default function OnlineGameBoard() {
 }
 
 function OnlineGameBoardInner({ room, roomId, myUid }) {
-  const { t } = useLanguage();
-  const [showSkipWarning, setShowSkipWarning] = useState(false);
-  const prevSkipTurnKeyRef = useRef(null);
-
   // ── Presence: write heartbeat every 30s so others can detect disconnect ──
   useEffect(() => {
     const writePresence = () =>
@@ -157,19 +151,6 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     }
   }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players]);
 
-  // ── Skip-warning: when it's my turn and my skipCount > 0 (I missed last
-  //    turn), show a one-time modal so I know I'm one skip away from a kick. ──
-  useEffect(() => {
-    const me = gameHook.state.players.find(p => p.uid === myUid);
-    if (!me) { prevSkipTurnKeyRef.current = null; return; }
-    const myTurn = gameHook.state.players[gameHook.state.currentPlayerIndex]?.uid === myUid;
-    if (!myTurn) { prevSkipTurnKeyRef.current = null; return; }
-    if ((me.skipCount ?? 0) === 0) { prevSkipTurnKeyRef.current = null; return; }
-    const key = `${gameHook.state.currentPlayerIndex}-${me.skipCount}`;
-    if (key !== prevSkipTurnKeyRef.current) setShowSkipWarning(true);
-    prevSkipTurnKeyRef.current = key;
-  }, [gameHook.state.currentPlayerIndex, gameHook.state.players, myUid]);
-
   // Use game-state players (not room.players) so indices stay correct after removals
   const myColor = gameHook.state.players.find(p => p.uid === myUid)?.color;
   const isAdmin = myUid === room.hostUid;
@@ -183,15 +164,6 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
   })();
 
   return (
-    <>
-      <GameBoard gameHook={gameHook} isMyTurn={isMyTurn} myPlayerColor={myColor} playAgainPath="/lobby" isHost={isAdmin} />
-      {showSkipWarning && (
-        <Modal title={t('skipWarningTitle')} onClose={() => setShowSkipWarning(false)}>
-          <p style={{ textAlign: 'center', fontSize: '2rem' }}>⏳</p>
-          <p style={{ textAlign: 'center' }}>{t('skipWarningMsg')}</p>
-          <button className="btn btn-primary" onClick={() => setShowSkipWarning(false)}>{t('ok')}</button>
-        </Modal>
-      )}
-    </>
+    <GameBoard gameHook={gameHook} isMyTurn={isMyTurn} myPlayerColor={myColor} playAgainPath="/lobby" isHost={isAdmin} />
   );
 }

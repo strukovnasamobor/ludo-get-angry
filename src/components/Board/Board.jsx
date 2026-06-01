@@ -62,6 +62,36 @@ const COLOR_HEX = {
   cyan: '#00838f', purple: '#8e24aa', magenta: '#f06292', orange: '#fb8c00',
 };
 
+// 🔄-style SWAP icon: rounded-square background painted in the player's exact
+// color, with white double-arrow curves on top. Mirrors the layout of the
+// emoji (colored tile + light arrows) so the cell still reads as 🔄 but the
+// tile color matches the placer.
+function SwapIcon({ color }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="100%"
+      height="100%"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="24" height="24" rx="4.5" fill={color} />
+      <g
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        transform="translate(2 2) scale(0.833)"
+      >
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <polyline points="3 3 3 8 8 8" />
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+        <polyline points="21 21 21 16 16 16" />
+      </g>
+    </svg>
+  );
+}
+
 function getArrowDir(path, idx) {
   const curr = path[idx];
   const next = path[(idx + 1) % path.length];
@@ -168,10 +198,11 @@ function BridgeOverlay({ bridgesOnBoard }) {
 function Figure({ playerColor, playerName, figId, isMoveable, isStop, isRewind, isBomb, onClick }) {
   const extra = isStop ? ' figure--stop' : isRewind ? ' figure--rewind' : isBomb ? ' figure--bomb' : '';
   const label = playerName || playerColor;
+  const hex = COLOR_HEX[playerColor];
   return (
     <div
       className={`figure${isMoveable ? ' figure--moveable' : ''}${extra}`}
-      style={{ backgroundColor: COLOR_HEX[playerColor] }}
+      style={{ backgroundColor: hex, '--figure-color': hex }}
       onClick={onClick}
       title={`${label} #${figId + 1}${isStop ? ' ⏸️' : isRewind ? ' ⏪' : isBomb ? ' 💣' : ''}`}
     />
@@ -248,7 +279,10 @@ export default function Board({
           specialIcon = SPECIAL_ICONS[sp.type];
           specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
-          if (sp.type === 'zamjena' && sp.placedBy) swapPlacerColor = COLOR_HEX[sp.placedBy];
+          if (sp.type === 'zamjena' && sp.placedBy) {
+            swapPlacerColor = COLOR_HEX[sp.placedBy];
+            specialIcon = <SwapIcon color={swapPlacerColor} />;
+          }
         } else {
           const hasBridge = bridgesOnBoard?.[spKey];
           const dest = getBridgeParallel('outer', cell.outerIdx);
@@ -270,7 +304,10 @@ export default function Board({
           specialIcon = SPECIAL_ICONS[sp.type];
           specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
-          if (sp.type === 'zamjena' && sp.placedBy) swapPlacerColor = COLOR_HEX[sp.placedBy];
+          if (sp.type === 'zamjena' && sp.placedBy) {
+            swapPlacerColor = COLOR_HEX[sp.placedBy];
+            specialIcon = <SwapIcon color={swapPlacerColor} />;
+          }
         } else {
           const hasBridge = bridgesOnBoard?.[spKey];
           const dest = getBridgeParallel('inner', cell.innerIdx);
@@ -324,7 +361,6 @@ export default function Board({
           {specialIcon && (
             <span
               className={`special-icon${specialBadge ? ' special-icon--badge' : ''}${swapPlacerColor ? ' special-icon--swap' : ''}`}
-              style={swapPlacerColor ? { '--placer-color': swapPlacerColor } : undefined}
               title={specialLabel || undefined}
             >
               {specialIcon}

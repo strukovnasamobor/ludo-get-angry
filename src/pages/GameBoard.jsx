@@ -46,10 +46,12 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRules, setShowRules]             = useState(false);
   const [showBombAlert, setShowBombAlert]     = useState(false);
+  const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [inStuckRolls, setInStuckRolls] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const autoAdvanceRef = useRef(null);
   const prevArmedKeyRef = useRef(null);
+  const prevSkipTurnKeyRef = useRef(null);
   const autoSkipPlacingRef = useRef(false);
 
   useEffect(() => {
@@ -59,6 +61,19 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     const key = armed ? `${state.currentPlayerIndex}-${armed.id}` : null;
     if (key && key !== prevArmedKeyRef.current) setShowBombAlert(true);
     prevArmedKeyRef.current = key;
+  }, [state.currentPlayerIndex, state.players, isMyTurn]);
+
+  // Skip warning: when the active player has skipCount > 0 (they missed their
+  // last turn) and it's their turn again, pop a one-time "Final warning" modal.
+  // Works for both offline (hot-seat: isMyTurn defaults to true → fires for
+  // every current player) and online (only fires on the active player's screen).
+  useEffect(() => {
+    if (!isMyTurn || !state.players?.length) { prevSkipTurnKeyRef.current = null; return; }
+    const me = state.players[state.currentPlayerIndex];
+    if (!me || (me.skipCount ?? 0) === 0) { prevSkipTurnKeyRef.current = null; return; }
+    const key = `${state.currentPlayerIndex}-${me.skipCount}`;
+    if (key !== prevSkipTurnKeyRef.current) setShowSkipWarning(true);
+    prevSkipTurnKeyRef.current = key;
   }, [state.currentPlayerIndex, state.players, isMyTurn]);
 
   // Derived
@@ -551,6 +566,14 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           <p style={{ textAlign: 'center', fontSize: '2rem' }}>💣</p>
           <p style={{ textAlign: 'center' }}>{t('bombAlertMsg')}</p>
           <button className="btn btn-primary" onClick={() => setShowBombAlert(false)}>{t('ok')}</button>
+        </Modal>
+      )}
+
+      {showSkipWarning && (
+        <Modal title={t('skipWarningTitle')} onClose={() => setShowSkipWarning(false)}>
+          <p style={{ textAlign: 'center', fontSize: '2rem' }}>⏳</p>
+          <p style={{ textAlign: 'center' }}>{t('skipWarningMsg')}</p>
+          <button className="btn btn-primary" onClick={() => setShowSkipWarning(false)}>{t('ok')}</button>
         </Modal>
       )}
 

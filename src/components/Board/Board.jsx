@@ -268,6 +268,7 @@ export default function Board({
       let specialIcon = null;
       let specialLabel = null;
       let specialBadge = false;
+      let specialArmed = false;
       let swapPlacerColor = null;
 
       if (cell.type === 'outer-path') {
@@ -279,6 +280,8 @@ export default function Board({
           specialIcon = SPECIAL_ICONS[sp.type];
           specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
+          if (sp.type === 'stop' && figs.some(f => f.stopArmed)) specialArmed = true;
+          if (sp.type === 'rewind' && figs.some(f => f.rewindArmed)) specialArmed = true;
           if (sp.type === 'zamjena' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
@@ -304,6 +307,8 @@ export default function Board({
           specialIcon = SPECIAL_ICONS[sp.type];
           specialLabel = t(SPECIAL_KEYS[sp.type]);
           specialBadge = figs.length > 0;
+          if (sp.type === 'stop' && figs.some(f => f.stopArmed)) specialArmed = true;
+          if (sp.type === 'rewind' && figs.some(f => f.rewindArmed)) specialArmed = true;
           if (sp.type === 'zamjena' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
@@ -360,7 +365,7 @@ export default function Board({
           )}
           {specialIcon && (
             <span
-              className={`special-icon${specialBadge ? ' special-icon--badge' : ''}${swapPlacerColor ? ' special-icon--swap' : ''}`}
+              className={`special-icon${specialBadge ? ' special-icon--badge' : ''}${swapPlacerColor ? ' special-icon--swap' : ''}${specialArmed ? ' special-icon--armed' : ''}`}
               title={specialLabel || undefined}
             >
               {specialIcon}

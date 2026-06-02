@@ -7,17 +7,17 @@ const SPECIALS = {
   hr: [
     { emoji: '🌉', name: 'MOST',    desc: 'Igrač čija je figurica aktivirala ili stala na MOST odlučuje hoće li figurica ostati ili s njom prelazi most.' },
     { emoji: '🎲', name: 'KOCKA',   desc: 'Igrač čija je figurica aktivirala ili stala na KOCKU baca dvije kocke i mora pokušati pomaknuti figuricu za dobiveni zbroj.' },
-    { emoji: '⏪', name: 'REWIND',  desc: 'Figurica koja je aktivirala ili stala na REWIND mora se kretati suprotno od kazaljke na satu na idućem potezu kada igrač odluči pomaknuti tu figuricu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom krugu.' },
+    { emoji: '⏪', name: 'REWIND',  desc: 'Figurica koja je aktivirala REWIND mora se pomaknuti na idućem potezu ili će se kretati suprotno od kazaljke na satu na potezu kada igrač odluči pomaknuti tu figuricu. Figurica koja stana na REWIND kreće se u suprotnom smjeru od kazaljke na satu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom krugu.' },
     { emoji: '💣', name: 'BOMBA',   desc: 'Figurica koja je aktivirala BOMBU mora se pomaknuti na idućem potezu ili će biti vraćena u svoj kvadratić HOME. Figurica koja stane na BOMBU vraća se u svoj kvadratić HOME i igrač koji je stao na bombu uzima je u ruku za ponovno postavljanje.' },
-    { emoji: '⏸️', name: 'STOP',    desc: 'Figurica koja je aktivirala ili stala na STOP smije se kretati samo za jedno polje kada se na kocki dobije broj jedan.' },
+    { emoji: '⏸️', name: 'STOP',    desc: 'Figurica koja je aktivirala STOP mora se pomaknuti na idućem potezu ili će se moći pomaknuti samo kada igrač dobije 1. Figurica koja je stala na STOP smije se kretati samo kada igrač dobije 1.' },
     { emoji: '🔄', name: 'ZAMJENA', desc: 'Igrač ćija je figurica stala na ZAMJENU bira slobodnu figuricu (izvan kvadratića HOME i FINISH) boje igrača koji je postavio to "posebno polje". Ako nema slobodnih figurica te boje zamjena se ne izvršava.' },
   ],
   en: [
     { emoji: '🌉', name: 'BRIDGE', desc: 'The player whose piece just activated or has landed on the BRIDGE decides whether to stay or cross to the parallel ring with that piece.' },
     { emoji: '🎲', name: 'DICE',   desc: 'The player whose piece just activated or has landed on the DICE roll two dice and must attempt to move that piece for the given sum.' },
-    { emoji: '⏪', name: 'REWIND', desc: 'The piece which activated or landed on the REWIND must move counter-clockwise on its next turn when the player decides to move that piece. The piece can\'t go beyond his exit point in the inner or outer ring.' },
+    { emoji: '⏪', name: 'REWIND', desc: 'The piece which activated REWIND must move counter-clockwise on its next turn when the player decides to move that piece. The piece that lands on REWIND moves in counter-clockwise direction. The piece can\'t go beyond his exit point in the inner or outer ring.' },
     { emoji: '💣', name: 'BOMB',   desc: 'The piece which activated BOMB must be moved on the player\'s next move or it will be returned to HOME. The piece that lands on a BOMB returns to HOME, and that player picks up the bomb to use again later.' },
-    { emoji: '⏸️', name: 'STOP',   desc: 'The piece which activated or landed on the STOP can move only when the dice shows 1.' },
+    { emoji: '⏸️', name: 'STOP',   desc: 'The piece which activated STOP must move on its next turn or it will be unable to move until the player rolls a 1. The piece that lands on STOP can only move when the player rolls a 1.' },
     { emoji: '🔄', name: 'SWAP',   desc: 'The player of the piece which landed on the SWAP choose a eligible piece (outside HOME and FINISH slots) which belongs to the player who placed this swap. If no eligible pieces exist, no swap occurs.' },
   ],
 };

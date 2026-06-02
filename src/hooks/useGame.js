@@ -14,10 +14,10 @@ function rollD6() {
 
 function initFigures() {
   return [
-    { id: 0, pos: 'home', rewindNext: false, stopActive: false, bombActive: null },
-    { id: 1, pos: 'home', rewindNext: false, stopActive: false, bombActive: null },
-    { id: 2, pos: 'home', rewindNext: false, stopActive: false, bombActive: null },
-    { id: 3, pos: 'home', rewindNext: false, stopActive: false, bombActive: null },
+    { id: 0, pos: 'home', rewindNext: false, stopActive: false, bombActive: null, stopArmed: false, rewindArmed: false },
+    { id: 1, pos: 'home', rewindNext: false, stopActive: false, bombActive: null, stopArmed: false, rewindArmed: false },
+    { id: 2, pos: 'home', rewindNext: false, stopActive: false, bombActive: null, stopArmed: false, rewindArmed: false },
+    { id: 3, pos: 'home', rewindNext: false, stopActive: false, bombActive: null, stopArmed: false, rewindArmed: false },
   ];
 }
 
@@ -257,6 +257,8 @@ function applyMove(state, move) {
     fig.stopActive = false;
     fig.rewindNext = false;
     fig.bombActive = null; // using this piece this turn saves it from detonation
+    fig.stopArmed = false;
+    fig.rewindArmed = false;
     mover.specialsHeld = [...mover.specialsHeld, special.type];
     const newSpecials = { ...state.specialsOnBoard };
     delete newSpecials[spKey];
@@ -269,6 +271,13 @@ function applyMove(state, move) {
       armed.stopActive = false;
       armed.rewindNext = false;
       armed.bombActive = null;
+      armed.stopArmed = false;
+      armed.rewindArmed = false;
+    });
+    // Armed STOP/REWIND on OTHER pieces: promote to active.
+    mover.figures.filter(f => f.id !== move.figId).forEach(armed => {
+      if (armed.stopArmed)   { armed.stopActive = true;   armed.stopArmed = false; }
+      if (armed.rewindArmed) { armed.rewindNext = true;   armed.rewindArmed = false; }
     });
     return { ...state, players: newPlayers, specialsOnBoard: newSpecials, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1 };
   }
@@ -294,6 +303,13 @@ function applyMove(state, move) {
       armed.stopActive = false;
       armed.rewindNext = false;
       armed.bombActive = null;
+      armed.stopArmed = false;
+      armed.rewindArmed = false;
+    });
+    // Armed STOP/REWIND on OTHER pieces: promote to active.
+    mover.figures.filter(f => f.id !== move.figId).forEach(armed => {
+      if (armed.stopArmed)   { armed.stopActive = true;   armed.stopArmed = false; }
+      if (armed.rewindArmed) { armed.rewindNext = true;   armed.rewindArmed = false; }
     });
     return { ...state, players: newPlayers, specialsOnBoard: newSpecials, bridgesOnBoard: newBridges, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1 };
   }
@@ -311,6 +327,8 @@ function applyMove(state, move) {
   fig.rewindNext = false;
   fig.stopActive = false;
   fig.bombActive = null; // escaped the bomb by moving (bomb remains on the square)
+  fig.stopArmed = false;   // moved → armed STOP doesn't escalate to stopActive
+  fig.rewindArmed = false; // moved → armed REWIND doesn't escalate to rewindNext
 
   if (move.type === 'exit') {
     fig.pos = { ring: move.ring, idx: move.idx };
@@ -331,6 +349,14 @@ function applyMove(state, move) {
     armed.stopActive = false;
     armed.rewindNext = false;
     armed.bombActive = null;
+    armed.stopArmed = false;
+    armed.rewindArmed = false;
+  });
+
+  // Armed STOP/REWIND on OTHER pieces (not the one moved): promote to active.
+  mover.figures.filter(f => f.id !== move.figId).forEach(armed => {
+    if (armed.stopArmed)   { armed.stopActive = true;   armed.stopArmed = false; }
+    if (armed.rewindArmed) { armed.rewindNext = true;   armed.rewindArmed = false; }
   });
 
   // Check for capture (only on path, not on finish/home)
@@ -491,6 +517,7 @@ function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
       figId,
       playerColor,
       placedBy: sp.placedBy,
+      source: 'landing',
     };
     return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
   }
@@ -510,6 +537,7 @@ function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
         figId,
         playerColor,
         placedBy: state.bridgesOnBoard[bridgeKey].placedBy,
+        source: 'landing',
       };
       return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
     }
@@ -528,6 +556,7 @@ function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
           figId,
           playerColor,
           placedBy: state.bridgesOnBoard[parallelKey].placedBy,
+          source: 'landing',
         };
         return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
       }
@@ -555,6 +584,8 @@ function applySpecialTrigger(state, trigger) {
   }
 
   if (type === 'stop') {
+    // Only reached via landing now — placement on placer's own piece is handled
+    // inline in PLACE_SPECIAL (armed silently, no modal).
     const mover = newPlayers.find(p => p.color === playerColor);
     const fig = mover.figures.find(f => f.id === figId);
     fig.stopActive = true;
@@ -562,6 +593,7 @@ function applySpecialTrigger(state, trigger) {
   }
 
   if (type === 'rewind') {
+    // Only reached via landing now — same reason as 'stop' above.
     const mover = newPlayers.find(p => p.color === playerColor);
     const fig = mover.figures.find(f => f.id === figId);
     fig.rewindNext = true;
@@ -603,6 +635,7 @@ function applyDuelResolve(state, atkRoll, defRoll) {
       figId: duelState.figId,
       playerColor: duelState.atkColor,
       placedBy: newState.specialsOnBoard[spKey].placedBy,
+      source: 'landing',
     };
     return applySpecialTrigger(newState, trigger);
   }
@@ -698,11 +731,19 @@ function reducer(state, action) {
         ? { ...state.bridgesOnBoard, [spKey]: { placedBy: player.color } }
         : state.bridgesOnBoard;
 
-      // Arm the placer's own piece standing on the bomb square
-      if (specialType === 'bomba') {
+      // Arm the placer's own piece standing on a BOMB/STOP/REWIND square so it
+      // gets one turn to move freely. Failure to move it converts the armed
+      // flag in applyMove's promote-armed sweep. No modal at placement time
+      // for these — the warning instead pops on the placer's next turn (see
+      // GameBoard.jsx bomb/stop/rewind alerts).
+      if (specialType === 'bomba' || specialType === 'stop' || specialType === 'rewind') {
         const placer = newPlayers.find(p => p.color === player.color);
         const placerFig = placer.figures.find(f => figureOnPath(f.pos, ring, idx));
-        if (placerFig) placerFig.bombActive = { placedBy: player.color };
+        if (placerFig) {
+          if (specialType === 'bomba')  placerFig.bombActive  = { placedBy: player.color };
+          if (specialType === 'stop')   placerFig.stopArmed   = true;
+          if (specialType === 'rewind') placerFig.rewindArmed = true;
+        }
       }
 
       // Check if figure on this cell is immediately affected (rule 9c)
@@ -710,7 +751,7 @@ function reducer(state, action) {
       let nextState = { ...state, players: newPlayers, specialsOnBoard: newSpecials, bridgesOnBoard: newBridges, phase: 'moving' };
 
       if (figHere && figHere.player.color !== player.color) {
-        // Immediate activation on opponent's figure
+        // Immediate activation on opponent's figure (landing-style effect).
         nextState = applySpecialTrigger(nextState, {
           type: specialType,
           ring,
@@ -718,16 +759,19 @@ function reducer(state, action) {
           figId: figHere.figure.id,
           playerColor: figHere.player.color,
           placedBy: player.color,
+          source: 'landing',
         });
       } else if (
         figHere
         && figHere.player.color === player.color
-        // bomba arms placer's piece (handled above), zamjena on self is meaningless
+        // bomba/stop/rewind arm placer's piece silently (handled above);
+        // zamjena on self is meaningless. MOST + KOCKA still need user input.
         && specialType !== 'bomba'
+        && specialType !== 'stop'
+        && specialType !== 'rewind'
         && specialType !== 'zamjena'
       ) {
-        // Rules 9.a, 9.b, 9.c, 9.e: special "just activates" for placer's own piece
-        // sitting on the cell when the special is placed.
+        // Rules 9.a, 9.b: BRIDGE / DICE "just activates" for placer's own piece.
         nextState = applySpecialTrigger(nextState, {
           type: specialType,
           ring,
@@ -735,6 +779,7 @@ function reducer(state, action) {
           figId: figHere.figure.id,
           playerColor: figHere.player.color,
           placedBy: player.color,
+          source: 'placement',
         });
       }
 
@@ -830,6 +875,7 @@ function reducer(state, action) {
           figId: trigger.figId,
           playerColor: trigger.playerColor,
           placedBy: baseState.specialsOnBoard[destKey].placedBy,
+          source: 'landing',
         });
       }
 

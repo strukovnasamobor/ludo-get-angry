@@ -222,7 +222,7 @@
   opacity: 0.85;
 }
 
-/* Special square icon */
+/* Special square icon — dormant on a cell, full opacity. */
 .special-icon {
   position: absolute;
   top: 50%;
@@ -231,16 +231,17 @@
   font-size: calc(var(--bs) / 38);
   pointer-events: none;
   z-index: 2;
+  opacity: 1;
 }
 
-/* Badge mode — figure also on this cell */
+/* Badge mode — a figure is on this cell. No dark backdrop ring. */
 .special-icon--badge {
   top: 1px;
   right: 1px;
   left: auto;
   transform: none;
   font-size: calc(var(--bs) / 52);
-  background: rgba(0, 0, 0, 0.62);
+  background: transparent;
   border-radius: 50%;
   width: calc(var(--bs) / 34);
   height: calc(var(--bs) / 34);
@@ -248,6 +249,13 @@
   align-items: center;
   justify-content: center;
   z-index: 3;
+  opacity: 1;
+}
+
+/* Armed (STOP/REWIND placed on placer's own piece) — fades while the piece
+   waits for its next turn. Resolves on next move (armed → active or cleared). */
+.special-icon--armed {
+  opacity: 0.65;
 }
 
 /* SWAP placer-color halo — owner identification per rule 9.f.

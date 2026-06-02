@@ -46,21 +46,45 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showRules, setShowRules]             = useState(false);
   const [showBombAlert, setShowBombAlert]     = useState(false);
+  const [showStopAlert, setShowStopAlert]     = useState(false);
+  const [showRewindAlert, setShowRewindAlert] = useState(false);
   const [showSkipWarning, setShowSkipWarning] = useState(false);
   const [inStuckRolls, setInStuckRolls] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const autoAdvanceRef = useRef(null);
   const prevArmedKeyRef = useRef(null);
+  const prevStopArmedKeyRef = useRef(null);
+  const prevRewindArmedKeyRef = useRef(null);
   const prevSkipTurnKeyRef = useRef(null);
   const autoSkipPlacingRef = useRef(false);
 
   useEffect(() => {
-    if (!isMyTurn || !state.players?.length) { prevArmedKeyRef.current = null; return; }
+    if (!isMyTurn || !state.players?.length) {
+      prevArmedKeyRef.current = null;
+      prevStopArmedKeyRef.current = null;
+      prevRewindArmedKeyRef.current = null;
+      return;
+    }
     const me = state.players[state.currentPlayerIndex];
-    const armed = me?.figures.find(f => f.bombActive);
-    const key = armed ? `${state.currentPlayerIndex}-${armed.id}` : null;
-    if (key && key !== prevArmedKeyRef.current) setShowBombAlert(true);
-    prevArmedKeyRef.current = key;
+    if (!me) return;
+
+    // BOMB armed
+    const bombFig = me.figures.find(f => f.bombActive);
+    const bombKey = bombFig ? `${state.currentPlayerIndex}-${bombFig.id}` : null;
+    if (bombKey && bombKey !== prevArmedKeyRef.current) setShowBombAlert(true);
+    prevArmedKeyRef.current = bombKey;
+
+    // STOP armed (placer's own piece, must move this turn or becomes stopActive)
+    const stopFig = me.figures.find(f => f.stopArmed);
+    const stopKey = stopFig ? `${state.currentPlayerIndex}-${stopFig.id}` : null;
+    if (stopKey && stopKey !== prevStopArmedKeyRef.current) setShowStopAlert(true);
+    prevStopArmedKeyRef.current = stopKey;
+
+    // REWIND armed (same pattern)
+    const rewindFig = me.figures.find(f => f.rewindArmed);
+    const rewindKey = rewindFig ? `${state.currentPlayerIndex}-${rewindFig.id}` : null;
+    if (rewindKey && rewindKey !== prevRewindArmedKeyRef.current) setShowRewindAlert(true);
+    prevRewindArmedKeyRef.current = rewindKey;
   }, [state.currentPlayerIndex, state.players, isMyTurn]);
 
   // Skip warning: when the active player has skipCount > 0 (they missed their
@@ -566,6 +590,22 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           <p style={{ textAlign: 'center', fontSize: '2rem' }}>💣</p>
           <p style={{ textAlign: 'center' }}>{t('bombAlertMsg')}</p>
           <button className="btn btn-primary" onClick={() => setShowBombAlert(false)}>{t('ok')}</button>
+        </Modal>
+      )}
+
+      {showStopAlert && (
+        <Modal title={t('stopAlertTitle')} onClose={() => setShowStopAlert(false)}>
+          <p style={{ textAlign: 'center', fontSize: '2rem' }}>⏸️</p>
+          <p style={{ textAlign: 'center' }}>{t('stopAlertMsg')}</p>
+          <button className="btn btn-primary" onClick={() => setShowStopAlert(false)}>{t('ok')}</button>
+        </Modal>
+      )}
+
+      {showRewindAlert && (
+        <Modal title={t('rewindAlertTitle')} onClose={() => setShowRewindAlert(false)}>
+          <p style={{ textAlign: 'center', fontSize: '2rem' }}>⏪</p>
+          <p style={{ textAlign: 'center' }}>{t('rewindAlertMsg')}</p>
+          <button className="btn btn-primary" onClick={() => setShowRewindAlert(false)}>{t('ok')}</button>
         </Modal>
       )}
 

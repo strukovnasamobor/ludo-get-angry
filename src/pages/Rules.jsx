@@ -109,8 +109,8 @@ export function RulesContent({ lang }) {
       </SubRule>
       <SubRule num="9.2.">
         {hr
-          ? 'Igrač koji je na potezu i dobio 6 može odabrati svoju figuricu i na to polje igrač može postaviti posebno polje koje ima ako to polje već nije posebno (osim MOSTA) i nije IZLAZ. Za MOST mora postojati paralelni kvadratić i ne smije prelaziti preko kvadratića HOME.'
-          : 'A player who rolls a 6 may choose one of their pieces and place a special square they own on that piece\'s current square, as long as it isn\'t already special (except for BRIDGE) or an EXIT. For BRIDGE, there must be a parallel square and it can\'t cross over any HOME square.'}
+          ? 'Igrač koji je na potezu i dobio 6 može odabrati svoju figuricu i na taj kvadratić može postaviti posebno polje koje ima ako u kvadratiću već nije posebno polje i nije IZLAZ. MOST može biti postavljen na izlazu i na drugim posebnim poljima, mora postojati paralelni kvadratić i ne smije prelaziti preko kvadratića HOME.'
+          : 'A player who rolls a 6 may choose one of their pieces and place a special square they own on that piece\'s current square, as long as it isn\'t already special or an EXIT. A BRIDGE can be placed on an EXIT and on other special squares, must have a parallel square, and can\'t cross over HOME squares.'}
       </SubRule>
       <SubRule num="9.3.">
         {hr

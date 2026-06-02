@@ -89,6 +89,11 @@
   "specialMostQ": "Ostani na polju ili prijeđi most?",
   "specialMostStay": "Ostani",
   "specialMostCross": "Prijeđi most",
+  "bridgeDirectionQ": "Odaberi smjer mosta",
+  "bridgeDirTop": "Gore",
+  "bridgeDirLeft": "Lijevo",
+  "bridgeDirRight": "Desno",
+  "bridgeDirBottom": "Dolje",
 
   "specialZamjenaTitle": "Zamjena figurice",
   "specialZamjenaRoll": "Baci kocku za odabir boje",

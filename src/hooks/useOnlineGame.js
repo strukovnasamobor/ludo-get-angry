@@ -59,16 +59,16 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
   const rollDice           = useCallback(() => dispatch({ type: 'ROLL_DICE' }), []);
   const selectMove         = useCallback(move => dispatch({ type: 'SELECT_MOVE', move }), []);
   const skipPlaceSpecial   = useCallback(() => dispatch({ type: 'SKIP_PLACE_SPECIAL' }), []);
-  const placeSpecial       = useCallback((ring, idx, specialType) =>
-    dispatch({ type: 'PLACE_SPECIAL', ring, idx, specialType }), []);
+  const placeSpecial       = useCallback((ring, idx, specialType, bridgeAnchorRing, bridgeAnchorIdx) =>
+    dispatch({ type: 'PLACE_SPECIAL', ring, idx, specialType, bridgeAnchorRing, bridgeAnchorIdx }), []);
   const resolveDuel        = useCallback((atkRoll, defRoll) =>
     dispatch({ type: 'RESOLVE_DUEL', atkRoll, defRoll }), []);
   const duelSetRoll        = useCallback((who, roll) =>
     dispatch({ type: 'DUEL_SET_ROLL', who, roll }), []);
   const forceDuelTimeout   = useCallback(() =>
     dispatch({ type: 'FORCE_DUEL_TIMEOUT' }), []);
-  const resolveMost        = useCallback((cross, trigger) =>
-    dispatch({ type: 'RESOLVE_MOST', cross, trigger }), []);
+  const resolveMost        = useCallback((cross, trigger, crossOptionIdx) =>
+    dispatch({ type: 'RESOLVE_MOST', cross, trigger, crossOptionIdx }), []);
   const resolveKocka       = useCallback((trigger, d1, d2) =>
     dispatch({ type: 'RESOLVE_KOCKA', trigger, d1, d2 }), []);
   const kockaSetRoll       = useCallback((d1, d2) =>

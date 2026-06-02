@@ -89,6 +89,11 @@
   "specialMostQ": "Stay on the square or cross the bridge?",
   "specialMostStay": "Stay",
   "specialMostCross": "Cross bridge",
+  "bridgeDirectionQ": "Choose bridge direction",
+  "bridgeDirTop": "Top",
+  "bridgeDirLeft": "Left",
+  "bridgeDirRight": "Right",
+  "bridgeDirBottom": "Bottom",
 
   "specialZamjenaTitle": "Swap piece",
   "specialZamjenaRoll": "Roll dice to choose color",

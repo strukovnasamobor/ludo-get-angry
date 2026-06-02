@@ -274,7 +274,8 @@ export default function Board({
       if (cell.type === 'outer-path') {
         const spKey = `outer-${cell.outerIdx}`;
         const figs = getFiguresOnCell('outer', cell.outerIdx, players);
-        // Non-bridge special takes priority for the icon; bridge shown on parallel cell too
+        // Non-bridge specials render their emoji here. Bridges render purely
+        // as the SVG line in <BridgeOverlay> — no emoji on cells.
         if (specialsOnBoard?.[spKey]) {
           const sp = specialsOnBoard[spKey];
           specialIcon = SPECIAL_ICONS[sp.type];
@@ -285,15 +286,6 @@ export default function Board({
           if (sp.type === 'zamjena' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
-          }
-        } else {
-          const hasBridge = bridgesOnBoard?.[spKey];
-          const dest = getBridgeParallel('outer', cell.outerIdx);
-          const parallelHasBridge = dest && bridgesOnBoard?.[`${dest.ring}-${dest.idx}`];
-          if (hasBridge || parallelHasBridge) {
-            specialIcon = SPECIAL_ICONS['most'];
-            specialLabel = t('specialMost');
-            specialBadge = figs.length > 0;
           }
         }
         const isTarget = validTargets?.some(t => t.ring === 'outer' && t.idx === cell.outerIdx);
@@ -312,15 +304,6 @@ export default function Board({
           if (sp.type === 'zamjena' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
-          }
-        } else {
-          const hasBridge = bridgesOnBoard?.[spKey];
-          const dest = getBridgeParallel('inner', cell.innerIdx);
-          const parallelHasBridge = dest && bridgesOnBoard?.[`${dest.ring}-${dest.idx}`];
-          if (hasBridge || parallelHasBridge) {
-            specialIcon = SPECIAL_ICONS['most'];
-            specialLabel = t('specialMost');
-            specialBadge = figs.length > 0;
           }
         }
         const isTarget = validTargets?.some(t => t.ring === 'inner' && t.idx === cell.innerIdx);

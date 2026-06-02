@@ -158,6 +158,9 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         } else {
           resolveZamjena(tr, null, null);
         }
+      } else if (tr?.type === 'most') {
+        // Default to Stay on timeout (safe — no teleport).
+        resolveMost(false, tr);
       } else if (tr?.type !== 'kocka') {
         dismissSpecialInfo();
       }
@@ -285,13 +288,19 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
       return;
     }
     // Placement during six-action: clicking a placement-target piece places the
-    // selected special on that piece's current cell.
+    // selected special on that piece's current cell. For BRIDGE on an inner
+    // corner cell, two anchor options exist — show a direction picker.
     if (isSixAction && selectedSpecialType) {
       if (playerColor !== currentPlayer.color) return;
-      const opt = activePlacementOptions.find(pm => pm.figId === figId);
-      if (!opt) return;
-      placeSpecial(opt.ring, opt.idx, selectedSpecialType);
-      setSelectedSpecialType(null);
+      const opts = activePlacementOptions.filter(pm => pm.figId === figId);
+      if (opts.length === 0) return;
+      if (opts.length === 1) {
+        const o = opts[0];
+        placeSpecial(o.ring, o.idx, selectedSpecialType, o.anchorRing, o.anchorIdx);
+        setSelectedSpecialType(null);
+      } else {
+        setBridgeDirChoice({ figId, options: opts });
+      }
       return;
     }
     if (!moveAndSixActionPhase) return;
@@ -319,6 +328,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   const [exitChoiceFig, setExitChoiceFig] = useState(null);
   const [pickupChoiceMoves, setPickupChoiceMoves] = useState(null);
+  const [bridgeDirChoice, setBridgeDirChoice] = useState(null);
 
   const pickupMoves = moveAndSixActionPhase
     ? validMoves.filter(m => m.type === 'pickup' || m.type === 'pickup-bridge')
@@ -337,17 +347,21 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   function handleCellClick({ cell }) {
     if (!isMyTurn) return;
     // Six-action with a special chip selected: clicking a placement-target cell
-    // places the special on that piece.
+    // places the special on that piece. Inner corner cells with 2 anchor
+    // options open the direction picker instead.
     if (isSixAction && selectedSpecialType) {
-      let opt = null;
+      let opts = [];
       if (cell.type === 'outer-path') {
-        opt = activePlacementOptions.find(pm => pm.ring === 'outer' && pm.idx === cell.outerIdx);
+        opts = activePlacementOptions.filter(pm => pm.ring === 'outer' && pm.idx === cell.outerIdx);
       } else if (cell.type === 'inner-path') {
-        opt = activePlacementOptions.find(pm => pm.ring === 'inner' && pm.idx === cell.innerIdx);
+        opts = activePlacementOptions.filter(pm => pm.ring === 'inner' && pm.idx === cell.innerIdx);
       }
-      if (opt) {
-        placeSpecial(opt.ring, opt.idx, selectedSpecialType);
+      if (opts.length === 1) {
+        const o = opts[0];
+        placeSpecial(o.ring, o.idx, selectedSpecialType, o.anchorRing, o.anchorIdx);
         setSelectedSpecialType(null);
+      } else if (opts.length > 1) {
+        setBridgeDirChoice({ figId: opts[0].figId, options: opts });
       }
       return;
     }
@@ -497,6 +511,37 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         </Modal>
       )}
 
+      {/* Bridge direction picker (inner corner cells with two anchor options) */}
+      {bridgeDirChoice && (() => {
+        const DIR_ICONS = { top: '⬆️', left: '⬅️', right: '➡️', bottom: '⬇️' };
+        const DIR_LABELS = {
+          top: t('bridgeDirTop')    || 'Top',
+          left: t('bridgeDirLeft')  || 'Left',
+          right: t('bridgeDirRight')|| 'Right',
+          bottom: t('bridgeDirBottom') || 'Bottom',
+        };
+        return (
+          <Modal title={`🌉 ${t('specialMost')}`} onClose={() => setBridgeDirChoice(null)}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
+              {t('bridgeDirectionQ') || 'Choose bridge direction'}
+            </p>
+            {bridgeDirChoice.options.map(o => (
+              <button
+                key={`${o.anchorRing}-${o.anchorIdx}`}
+                className="btn btn-secondary"
+                onClick={() => {
+                  placeSpecial(o.ring, o.idx, 'most', o.anchorRing, o.anchorIdx);
+                  setBridgeDirChoice(null);
+                  setSelectedSpecialType(null);
+                }}
+              >
+                {DIR_ICONS[o.dir] || '🌉'} {DIR_LABELS[o.dir] || o.dir}
+              </button>
+            ))}
+          </Modal>
+        );
+      })()}
+
       {/* Pickup choice modal */}
       {pickupChoiceMoves && (() => {
         const SPECIAL_ICONS = { most: '🌉', kocka: '🎲', rewind: '⏪', bomba: '💣', stop: '⏸️', zamjena: '🔄' };
@@ -570,7 +615,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           players={state.players}
           t={t}
           isMyTurn={isMyTurn}
-          onMost={cross => resolveMost(cross, state.specialTrigger)}
+          onMost={(cross, crossOptionIdx) => resolveMost(cross, state.specialTrigger, crossOptionIdx)}
           onKockaSetRoll={(d1, d2) => kockaSetRoll(d1, d2)}
           onKocka={(d1, d2) => resolveKocka(state.specialTrigger, d1, d2)}
           onDismiss={dismissSpecialInfo}
@@ -803,6 +848,24 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
   }
 
   if (trigger.type === 'most') {
+    const crossOptions = trigger.crossOptions || [];
+    const myPath = trigger.ring === 'outer' ? OUTER_PATH : INNER_PATH;
+    const myCell = myPath[trigger.idx];
+    function dirOf(opt) {
+      const oPath = opt.otherRing === 'outer' ? OUTER_PATH : INNER_PATH;
+      const oc = oPath[opt.otherIdx];
+      if (oc.r < myCell.r) return 'top';
+      if (oc.r > myCell.r) return 'bottom';
+      if (oc.c < myCell.c) return 'left';
+      return 'right';
+    }
+    const DIR_ICONS = { top: '⬆️', left: '⬅️', right: '➡️', bottom: '⬇️' };
+    const DIR_LABELS = {
+      top: t('bridgeDirTop') || 'Top',
+      left: t('bridgeDirLeft') || 'Left',
+      right: t('bridgeDirRight') || 'Right',
+      bottom: t('bridgeDirBottom') || 'Bottom',
+    };
     return (
       <Modal title={`🌉 ${t('specialMost')}`}>
         {ownerLine}
@@ -810,7 +873,18 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
         {isMyTurn ? (
           <>
             <button className="btn btn-secondary" onClick={() => onMost(false)}>{t('specialMostStay')}</button>
-            <button className="btn btn-primary" onClick={() => onMost(true)}>{t('specialMostCross')}</button>
+            {crossOptions.length <= 1 ? (
+              <button className="btn btn-primary" onClick={() => onMost(true, 0)}>{t('specialMostCross')}</button>
+            ) : (
+              crossOptions.map((opt, i) => {
+                const d = dirOf(opt);
+                return (
+                  <button key={i} className="btn btn-primary" onClick={() => onMost(true, i)}>
+                    {DIR_ICONS[d]} {t('specialMostCross')} ({DIR_LABELS[d]})
+                  </button>
+                );
+              })
+            )}
           </>
         ) : (
           <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>

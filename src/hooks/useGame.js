@@ -8,6 +8,39 @@ import {
 const OUTER_LEN = OUTER_PATH.length; // 72
 const INNER_LEN = INNER_PATH.length; // 48
 
+// Inner corner cells where a BRIDGE has TWO possible outer anchors (one per
+// perpendicular direction). When placing a bridge from one of these inner
+// cells, the user picks which anchor → which direction the bridge runs.
+// Each anchor here is `{anchorRing, anchorIdx, dir}`; dir is the cardinal
+// direction the bridge extends FROM the inner corner cell.
+const INNER_CORNER_ANCHORS = {
+  0:  [{ anchorRing: 'outer', anchorIdx: 3,  dir: 'top'    }, { anchorRing: 'outer', anchorIdx: 69, dir: 'left'   }],
+  12: [{ anchorRing: 'outer', anchorIdx: 15, dir: 'top'    }, { anchorRing: 'outer', anchorIdx: 21, dir: 'right'  }],
+  24: [{ anchorRing: 'outer', anchorIdx: 33, dir: 'right'  }, { anchorRing: 'outer', anchorIdx: 39, dir: 'bottom' }],
+  36: [{ anchorRing: 'outer', anchorIdx: 51, dir: 'bottom' }, { anchorRing: 'outer', anchorIdx: 57, dir: 'left'   }],
+};
+
+// Find every bridge connecting to (ring, idx). A bridge connects two cells:
+// its anchor (the bridgesOnBoard key) and getBridgeParallel(anchor). We may
+// be either endpoint. Returns [{anchor, other, placedBy}, ...].
+export function getBridgesAt(ring, idx, bridgesOnBoard) {
+  const result = [];
+  for (const [key, bridge] of Object.entries(bridgesOnBoard || {})) {
+    const [r, iStr] = key.split('-');
+    const i = Number(iStr);
+    if (r === ring && i === idx) {
+      const other = getBridgeParallel(r, i);
+      if (other) result.push({ anchor: { ring: r, idx: i }, other, placedBy: bridge.placedBy });
+      continue;
+    }
+    const parallel = getBridgeParallel(r, i);
+    if (parallel && parallel.ring === ring && parallel.idx === idx) {
+      result.push({ anchor: { ring: r, idx: i }, other: { ring: r, idx: i }, placedBy: bridge.placedBy });
+    }
+  }
+  return result;
+}
+
 function rollD6() {
   return Math.floor(Math.random() * 6) + 1;
 }
@@ -131,7 +164,9 @@ function getPlacementTarget(state, color, figId, specialType) {
   if (!fig || typeof fig.pos !== 'object' || !fig.pos.ring) return null;
   const { ring, idx } = fig.pos;
   const activeColors = state.players.map(p => p.color);
-  if (!canPlaceSpecial(ring, idx, activeColors)) return null;
+  // BRIDGE can be placed on EXIT cells (Rule 9.2 new). Other specials cannot.
+  const allowExit = specialType === 'most';
+  if (!canPlaceSpecial(ring, idx, activeColors, allowExit)) return null;
   const spKey = `${ring}-${idx}`;
   if (specialType === 'most') {
     if (!canPlaceMost(ring, idx, state.bridgesOnBoard)) return null;
@@ -143,6 +178,10 @@ function getPlacementTarget(state, color, figId, specialType) {
 
 // All placement options for the current player on a 6-roll: cross-product of
 // (held special types) × (their own pieces on path cells legal for that type).
+// Each entry carries `anchorRing/anchorIdx` — where the storage key goes.
+// For non-bridge specials or non-corner BRIDGE placements, the anchor IS the
+// piece's cell. For BRIDGE on an inner corner cell, two entries are emitted
+// (one per perpendicular outer anchor) so the UI can ask which direction.
 export function getPlacementMoves(state) {
   const player = state.players[state.currentPlayerIndex];
   if (!player) return [];
@@ -150,8 +189,31 @@ export function getPlacementMoves(state) {
   const results = [];
   uniqueSpecials.forEach(specialType => {
     player.figures.forEach(fig => {
+      if (typeof fig.pos !== 'object' || !fig.pos.ring) return;
+      const { ring, idx } = fig.pos;
+
+      // Bridge on inner corner: emit one entry per valid outer anchor.
+      if (specialType === 'most' && ring === 'inner' && INNER_CORNER_ANCHORS[idx]) {
+        INNER_CORNER_ANCHORS[idx].forEach(({ anchorRing, anchorIdx, dir }) => {
+          if (!canPlaceMost(anchorRing, anchorIdx, state.bridgesOnBoard)) return;
+          results.push({
+            specialType: 'most',
+            figId: fig.id,
+            ring, idx,
+            anchorRing, anchorIdx,
+            dir,
+          });
+        });
+        return;
+      }
+
       const t = getPlacementTarget(state, player.color, fig.id, specialType);
-      if (t) results.push({ specialType, figId: fig.id, ring: t.ring, idx: t.idx });
+      if (!t) return;
+      results.push({
+        specialType, figId: fig.id,
+        ring: t.ring, idx: t.idx,
+        anchorRing: t.ring, anchorIdx: t.idx,
+      });
     });
   });
   return results;
@@ -170,9 +232,16 @@ export function getValidMoves(state, diceVal) {
       if (state.specialsOnBoard[spKey]) {
         moves.push({ figId: fig.id, type: 'pickup', ring: fig.pos.ring, idx: fig.pos.idx });
       }
-      if (state.bridgesOnBoard[spKey]) {
-        moves.push({ figId: fig.id, type: 'pickup-bridge', ring: fig.pos.ring, idx: fig.pos.idx });
-      }
+      // pickup-bridge: any bridge whose endpoints include this cell (anchor or
+      // the parallel-of-anchor). One pickup-bridge move per connecting bridge.
+      const connecting = getBridgesAt(fig.pos.ring, fig.pos.idx, state.bridgesOnBoard);
+      connecting.forEach(b => {
+        moves.push({
+          figId: fig.id, type: 'pickup-bridge',
+          ring: fig.pos.ring, idx: fig.pos.idx,
+          anchorRing: b.anchor.ring, anchorIdx: b.anchor.idx,
+        });
+      });
     }
 
     // STOP: can only move if dice = 1
@@ -328,8 +397,13 @@ function applyMove(state, move) {
   }
 
   if (move.type === 'pickup-bridge') {
-    const spKey = `${move.ring}-${move.idx}`;
-    if (!state.bridgesOnBoard[spKey]) return state;
+    // anchorRing/Idx is the bridgesOnBoard key (may differ from the piece's
+    // cell when the bridge is anchored on the parallel side, e.g. inner
+    // corner cells served by a bridge anchored at an outer cell).
+    const aRing = move.anchorRing || move.ring;
+    const aIdx = move.anchorIdx != null ? move.anchorIdx : move.idx;
+    const anchorKey = `${aRing}-${aIdx}`;
+    if (!state.bridgesOnBoard[anchorKey]) return state;
     let newPlayers = deepCopyPlayers(state.players);
     let newSpecials = { ...state.specialsOnBoard };
     const mover = newPlayers.find(p => p.color === player.color);
@@ -338,7 +412,7 @@ function applyMove(state, move) {
     // those effects is still on the board, so the piece stays under its effect.
     mover.specialsHeld = [...mover.specialsHeld, 'most'];
     const newBridges = { ...state.bridgesOnBoard };
-    delete newBridges[spKey];
+    delete newBridges[anchorKey];
     mover.figures.filter(f => f.id !== move.figId && f.bombActive).forEach(armed => {
       if (typeof armed.pos === 'object' && armed.pos.ring) {
         delete newSpecials[`${armed.pos.ring}-${armed.pos.idx}`];
@@ -434,18 +508,22 @@ function afterMove(state, _move) {
   return advanceTurn(state);
 }
 
-// Shared landing logic with the Rule-9 precedence:
+// Shared landing logic with the corrected Rule-9 precedence:
 //   1. Duel on collision
-//   2. BOMB always fires (regardless of bridge)
-//   3. SWAP fires if placer has eligible target; own-SWAP shows info
-//   4. Bridge (direct or parallel) → Stay/Cross modal
-//   5. Other special (REWIND/STOP/KOCKA) on this cell
-//   6. No trigger → afterMove
+//   2. BRIDGE (direct or parallel) AND can cross → Stay/Cross modal FIRST.
+//        Stay → re-enters this helper with skipBridge=true → triggers special.
+//        Cross → teleport, then re-enter with skipBridge=true at destination.
+//   3. No bridge (or destination blocked, or skipBridge=true): walk the special
+//        on THIS cell — BOMB → SWAP-own / SWAP-eligible / SWAP-fizzle → REWIND
+//        → STOP → KOCKA → afterMove.
 //
-// `skipBridge` is set after a Cross teleport so we don't re-prompt and loop
-// back across the same bridge.
+// Crossing the bridge means the piece never "landed" on this cell's special, so
+// the special does not fire when Cross is chosen.
 function applyLandingPrecedence(state, newPlayers, ring, idx, figId, playerColor, skipBridge = false) {
-  // 1. Duel on collision
+  // 1. Duel on collision. `skipBridge` rides along on the duel state so that
+  //    after the attacker wins, the post-duel precedence at this same cell
+  //    keeps the bridge step skipped — otherwise a Cross → duel → win loop
+  //    would re-prompt the same bridge that just teleported the piece here.
   const occupied = findFigureOnCell(newPlayers.filter(p => p.color !== playerColor), ring, idx);
   if (occupied) {
     const duelSt = {
@@ -454,64 +532,65 @@ function applyLandingPrecedence(state, newPlayers, ring, idx, figId, playerColor
       ring, idx, figId,
       defFigId: occupied.figure.id,
       atkRoll: null, defRoll: null,
+      skipBridge,
     };
     return { ...state, players: newPlayers, duelState: duelSt, phase: 'duel' };
   }
 
   const spKey = `${ring}-${idx}`;
   const sp = state.specialsOnBoard[spKey];
-  const bridgeHere = state.bridgesOnBoard[spKey];
-  const parallel = getBridgeParallel(ring, idx);
-  const parallelBridge = parallel ? state.bridgesOnBoard[`${parallel.ring}-${parallel.idx}`] : null;
 
-  // 2. BOMB pre-empts everything
-  if (sp && sp.type === 'bomba') {
-    return applySpecialTrigger({ ...state, players: newPlayers }, {
-      type: 'bomba', ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
-    });
+  // 2. BRIDGE always wins precedence: Stay/Cross modal first (when present and
+  //    at least one crossing destination is reachable). Multiple connecting
+  //    bridges produce multiple Cross options (inner corners — see Rule 9.2).
+  if (!skipBridge) {
+    const connecting = getBridgesAt(ring, idx, state.bridgesOnBoard);
+    const crossOptions = connecting
+      .filter(b => !findFigureOnCell(
+        newPlayers.filter(p => p.color === playerColor), b.other.ring, b.other.idx,
+      ))
+      .map(b => ({
+        anchorRing: b.anchor.ring, anchorIdx: b.anchor.idx,
+        otherRing: b.other.ring, otherIdx: b.other.idx,
+        placedBy: b.placedBy,
+      }));
+    if (crossOptions.length > 0) {
+      return applySpecialTrigger({ ...state, players: newPlayers }, {
+        type: 'most', ring, idx, figId, playerColor,
+        placedBy: crossOptions[0].placedBy,
+        crossOptions,
+        source: 'landing',
+      });
+    }
   }
 
-  // 3. SWAP: own-field shows info; otherwise fires if placer has any eligible piece
-  if (sp && sp.type === 'zamjena') {
-    if (sp.placedBy === playerColor) {
-      return {
-        ...state,
-        players: newPlayers,
-        phase: 'special-trigger',
-        specialTrigger: { type: 'zamjena-own', ring, idx, figId, playerColor, placedBy: sp.placedBy },
-      };
+  // 3. No bridge (or forced-Stay): fire whatever special sits on THIS cell.
+  if (sp) {
+    if (sp.type === 'bomba') {
+      return applySpecialTrigger({ ...state, players: newPlayers }, {
+        type: 'bomba', ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
+      });
     }
-    const placer = newPlayers.find(p => p.color === sp.placedBy);
-    const eligible = !!placer && placer.figures.some(f =>
-      typeof f.pos === 'object' && f.pos.ring
-      && !(f.pos.ring === ring && f.pos.idx === idx)
-    );
-    if (eligible) {
+    if (sp.type === 'zamjena') {
+      if (sp.placedBy === playerColor) {
+        return {
+          ...state,
+          players: newPlayers,
+          phase: 'special-trigger',
+          specialTrigger: { type: 'zamjena-own', ring, idx, figId, playerColor, placedBy: sp.placedBy },
+        };
+      }
+      // Fires regardless of eligibility — the RESOLVE_ZAMJENA path handles the
+      // "no eligible figs" case via the strip UI / random fallback.
       return applySpecialTrigger({ ...state, players: newPlayers }, {
         type: 'zamjena', ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
       });
     }
-    // Not eligible — SWAP fizzles; fall through to bridge / others.
-  }
-
-  // 4. Bridge — Stay/Cross modal. Skipped after a Cross teleport.
-  if (!skipBridge && (bridgeHere || parallelBridge)) {
-    const destBlockedByOwn = parallel && !!findFigureOnCell(
-      newPlayers.filter(p => p.color === playerColor), parallel.ring, parallel.idx
-    );
-    if (!destBlockedByOwn) {
-      const placedBy = (bridgeHere ?? parallelBridge).placedBy;
+    if (sp.type === 'rewind' || sp.type === 'stop' || sp.type === 'kocka') {
       return applySpecialTrigger({ ...state, players: newPlayers }, {
-        type: 'most', ring, idx, figId, playerColor, placedBy, source: 'landing',
+        type: sp.type, ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
       });
     }
-  }
-
-  // 5. REWIND / STOP / KOCKA on this cell (no bridge involved)
-  if (sp && (sp.type === 'rewind' || sp.type === 'stop' || sp.type === 'kocka')) {
-    return applySpecialTrigger({ ...state, players: newPlayers }, {
-      type: sp.type, ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
-    });
   }
 
   return afterMove({ ...state, players: newPlayers }, { type: 'move', ring, idx });
@@ -584,7 +663,8 @@ function applyDuelResolve(state, atkRoll, defRoll) {
   const newState = { ...state, players: newPlayers, duelState: null };
   if (!attackerWon) return advanceTurn(newState);
   // Attacker stays on the cell — resolve any special/bridge stack via the
-  // unified precedence (BOMB > SWAP > BRIDGE > REWIND/STOP/KOCKA).
+  // unified precedence. Inherit duelState.skipBridge so a duel born from a
+  // Cross teleport doesn't re-offer the just-crossed bridge.
   return applyLandingPrecedence(
     newState,
     newPlayers,
@@ -592,7 +672,7 @@ function applyDuelResolve(state, atkRoll, defRoll) {
     duelState.idx,
     duelState.figId,
     duelState.atkColor,
-    false,
+    !!duelState.skipBridge,
   );
 }
 
@@ -662,7 +742,7 @@ function reducer(state, action) {
     }
 
     case 'PLACE_SPECIAL': {
-      const { ring, idx, specialType } = action;
+      const { ring, idx, specialType, bridgeAnchorRing, bridgeAnchorIdx } = action;
       const player = state.players[state.currentPlayerIndex];
 
       // Rule 9.2 (new): placement is gated on a 6-roll → 'six-action' phase.
@@ -673,9 +753,21 @@ function reducer(state, action) {
       const placerFig = player.figures.find(f => figureOnPath(f.pos, ring, idx));
       if (!placerFig) return state;
 
-      // Validate target via shared helper (handles BRIDGE-coexistence loosening).
-      const target = getPlacementTarget(state, player.color, placerFig.id, specialType);
-      if (!target) return state;
+      // For BRIDGE with an explicit anchor (inner-corner direction picker):
+      // validate that the anchor's parallel is the piece's cell, and that
+      // canPlaceMost passes for the anchor. Otherwise fall through to the
+      // shared placement-target helper.
+      let bridgeAnchor = null;
+      if (specialType === 'most' && bridgeAnchorRing && bridgeAnchorIdx != null
+          && !(bridgeAnchorRing === ring && bridgeAnchorIdx === idx)) {
+        const parallel = getBridgeParallel(bridgeAnchorRing, bridgeAnchorIdx);
+        if (!parallel || parallel.ring !== ring || parallel.idx !== idx) return state;
+        if (!canPlaceMost(bridgeAnchorRing, bridgeAnchorIdx, state.bridgesOnBoard)) return state;
+        bridgeAnchor = { ring: bridgeAnchorRing, idx: bridgeAnchorIdx };
+      } else {
+        const target = getPlacementTarget(state, player.color, placerFig.id, specialType);
+        if (!target) return state;
+      }
 
       const newPlayers = deepCopyPlayers(state.players).map(p => {
         if (p.color !== player.color) return p;
@@ -684,6 +776,11 @@ function reducer(state, action) {
         return p;
       });
       const spKey = `${ring}-${idx}`;
+      // Where the bridge entry is keyed in bridgesOnBoard: explicit anchor if
+      // an inner-corner direction was picked, else the piece's cell.
+      const anchorKey = bridgeAnchor
+        ? `${bridgeAnchor.ring}-${bridgeAnchor.idx}`
+        : spKey;
 
       // Bridges go into bridgesOnBoard, others into specialsOnBoard.
       // BRIDGE-coexistence with a non-bridge special is allowed (Rule 9.2 new).
@@ -691,7 +788,7 @@ function reducer(state, action) {
         ? state.specialsOnBoard
         : { ...state.specialsOnBoard, [spKey]: { type: specialType, placedBy: player.color } };
       const newBridges = specialType === 'most'
-        ? { ...state.bridgesOnBoard, [spKey]: { placedBy: player.color } }
+        ? { ...state.bridgesOnBoard, [anchorKey]: { placedBy: player.color } }
         : state.bridgesOnBoard;
 
       // Arm the placer's own piece for BOMB/STOP/REWIND (silent armed pattern).
@@ -708,14 +805,35 @@ function reducer(state, action) {
 
       const baseState = { ...state, players: newPlayers, specialsOnBoard: newSpecials, bridgesOnBoard: newBridges };
 
-      // MOST / KOCKA on placer's own piece — activate immediately. After the
-      // user resolves the modal, the post-trigger flow returns to Stage B via
-      // afterMove's bonusRoll check (bonusRoll is still true here).
-      if (specialType === 'most' || specialType === 'kocka') {
+      // MOST on placer's own piece — fires immediately. Build crossOptions so
+      // RESOLVE_MOST can teleport on Cross. Use the updated bridges dict so the
+      // just-placed bridge is included.
+      if (specialType === 'most') {
+        const connecting = getBridgesAt(ring, idx, newBridges);
+        const crossOptions = connecting
+          .filter(b => !findFigureOnCell(
+            newPlayers.filter(p => p.color === player.color),
+            b.other.ring, b.other.idx,
+          ))
+          .map(b => ({
+            anchorRing: b.anchor.ring, anchorIdx: b.anchor.idx,
+            otherRing: b.other.ring, otherIdx: b.other.idx,
+            placedBy: b.placedBy,
+          }));
         return applySpecialTrigger(baseState, {
-          type: specialType,
-          ring,
-          idx,
+          type: 'most',
+          ring, idx,
+          figId: placerFig.id,
+          playerColor: player.color,
+          placedBy: player.color,
+          crossOptions,
+          source: 'placement',
+        });
+      }
+      if (specialType === 'kocka') {
+        return applySpecialTrigger(baseState, {
+          type: 'kocka',
+          ring, idx,
           figId: placerFig.id,
           playerColor: player.color,
           placedBy: player.color,
@@ -754,34 +872,33 @@ function reducer(state, action) {
     }
 
     case 'RESOLVE_MOST': {
-      const { cross, trigger } = action;
+      const { cross, trigger, crossOptionIdx } = action;
       if (!cross) {
-        // Stay — if a non-bridge special exists on this cell (BRIDGE-coexistence
-        // under new Rule 9.2), trigger it now. BOMB/SWAP would have fired before
-        // the bridge modal, so only REWIND/STOP/KOCKA can remain.
-        const spKey = `${trigger.ring}-${trigger.idx}`;
-        const sp = state.specialsOnBoard[spKey];
-        if (sp && (sp.type === 'rewind' || sp.type === 'stop' || sp.type === 'kocka')) {
-          return applySpecialTrigger({ ...state, specialTrigger: null }, {
-            type: sp.type,
-            ring: trigger.ring, idx: trigger.idx,
-            figId: trigger.figId,
-            playerColor: trigger.playerColor,
-            placedBy: sp.placedBy,
-            source: 'landing',
-          });
-        }
-        return afterMove({ ...state, specialTrigger: null }, { type: 'move', ring: trigger.ring, idx: trigger.idx });
-      }
-      const dest = getBridgeParallel(trigger.ring, trigger.idx);
-      if (!dest) {
-        return afterMove({ ...state, specialTrigger: null }, { type: 'move', ring: trigger.ring, idx: trigger.idx });
+        // Stay — re-run the landing precedence WITHOUT the bridge step so any
+        // non-bridge special (BOMB / SWAP / REWIND / STOP / KOCKA) on this cell
+        // triggers now. The piece position hasn't changed.
+        return applyLandingPrecedence(
+          { ...state, specialTrigger: null },
+          state.players,
+          trigger.ring, trigger.idx,
+          trigger.figId, trigger.playerColor,
+          true,
+        );
       }
 
-      // Can't cross if own piece (other than the mover) is already on the destination
+      // Cross: pick the chosen option (defaults to first when only one exists).
+      const opts = trigger.crossOptions || [];
+      const picked = opts[crossOptionIdx ?? 0];
+      if (!picked) {
+        return afterMove({ ...state, specialTrigger: null }, { type: 'move', ring: trigger.ring, idx: trigger.idx });
+      }
+      const destRing = picked.otherRing;
+      const destIdx = picked.otherIdx;
+
+      // Re-check own-piece blocking — state may have shifted since trigger.
       const ownBlocksDest = state.players
         .filter(p => p.color === trigger.playerColor)
-        .some(p => p.figures.some(f => f.id !== trigger.figId && figureOnPath(f.pos, dest.ring, dest.idx)));
+        .some(p => p.figures.some(f => f.id !== trigger.figId && figureOnPath(f.pos, destRing, destIdx)));
       if (ownBlocksDest) {
         return afterMove({ ...state, specialTrigger: null }, { type: 'move', ring: trigger.ring, idx: trigger.idx });
       }
@@ -789,15 +906,15 @@ function reducer(state, action) {
       let newPlayers = deepCopyPlayers(state.players);
       const mover = newPlayers.find(p => p.color === trigger.playerColor);
       const fig = mover.figures.find(f => f.id === trigger.figId);
-      fig.pos = { ring: dest.ring, idx: dest.idx };
+      fig.pos = { ring: destRing, idx: destIdx };
 
       // Resolve specials at destination using the unified precedence. Skip the
       // bridge step at destination to avoid looping right back across.
       return applyLandingPrecedence(
         { ...state, specialTrigger: null },
         newPlayers,
-        dest.ring,
-        dest.idx,
+        destRing,
+        destIdx,
         trigger.figId,
         trigger.playerColor,
         true,
@@ -1080,16 +1197,16 @@ export function useGame(setupPlayers) {
   const rollDice = useCallback(() => dispatch({ type: 'ROLL_DICE' }), []);
   const selectMove = useCallback(move => dispatch({ type: 'SELECT_MOVE', move }), []);
   const skipPlaceSpecial = useCallback(() => dispatch({ type: 'SKIP_PLACE_SPECIAL' }), []);
-  const placeSpecial = useCallback((ring, idx, specialType) =>
-    dispatch({ type: 'PLACE_SPECIAL', ring, idx, specialType }), []);
+  const placeSpecial = useCallback((ring, idx, specialType, bridgeAnchorRing, bridgeAnchorIdx) =>
+    dispatch({ type: 'PLACE_SPECIAL', ring, idx, specialType, bridgeAnchorRing, bridgeAnchorIdx }), []);
   const resolveDuel = useCallback((atkRoll, defRoll) =>
     dispatch({ type: 'RESOLVE_DUEL', atkRoll, defRoll }), []);
   const duelSetRoll = useCallback((who, roll) =>
     dispatch({ type: 'DUEL_SET_ROLL', who, roll }), []);
   const forceDuelTimeout = useCallback(() =>
     dispatch({ type: 'FORCE_DUEL_TIMEOUT' }), []);
-  const resolveMost = useCallback((cross, trigger) =>
-    dispatch({ type: 'RESOLVE_MOST', cross, trigger }), []);
+  const resolveMost = useCallback((cross, trigger, crossOptionIdx) =>
+    dispatch({ type: 'RESOLVE_MOST', cross, trigger, crossOptionIdx }), []);
   const resolveKocka = useCallback((trigger, d1, d2) =>
     dispatch({ type: 'RESOLVE_KOCKA', trigger, d1, d2 }), []);
   const kockaSetRoll = useCallback((d1, d2) => dispatch({ type: 'KOCKA_SET_ROLL', d1, d2 }), []);

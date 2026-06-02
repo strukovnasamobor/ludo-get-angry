@@ -76,11 +76,11 @@ export default function PlayerPanel({
         })()}
       </div>
 
-      {/* Specials in hand — clickable to place during six-action (a 6 was rolled). */}
+      {/* Specials in hand — clickable to place ONLY during six-action (a 6 was rolled). */}
       <div className="panel-specials">
         {Object.entries(specialCounts).map(([type, count]) => {
           const canPlace = isSixAction && placeable.has(type);
-          const isDisabled = isSixAction && !canPlace;
+          const isDisabled = !isSixAction || !canPlace;
           return (
             <button
               key={type}

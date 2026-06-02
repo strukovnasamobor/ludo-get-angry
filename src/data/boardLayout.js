@@ -208,6 +208,14 @@ export function getBridgeParallel(ring, idx) {
   const { r, c } = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
 
   if (ring === 'outer') {
+    // Four corner-adjacent bridges (the "second possibility" at each inner
+    // corner — connects the perpendicular side-edge cell next to a HOME
+    // corner to the inner ring's corresponding corner cell).
+    if (r === 3  && c === 0)  return { ring: 'inner', idx: 0  };  // red exitOuter
+    if (r === 3  && c === 18) return { ring: 'inner', idx: 12 };
+    if (r === 18 && c === 15) return { ring: 'inner', idx: 24 };
+    if (r === 15 && c === 0)  return { ring: 'inner', idx: 36 };
+
     if (r === 0 && c >= 3 && c <= 15) {
       if (isHomeCell(1, c) || isHomeCell(2, c)) return null;
       return { ring: 'inner', idx: c - 3 };
@@ -246,8 +254,11 @@ export function getBridgeParallel(ring, idx) {
   }
 }
 
-// Check if a MOST bridge can be placed at (ring, idx).
+// Check if a MOST bridge can be anchored at (ring, idx).
 // Returns the destination {ring, idx} on success, or null if invalid.
+// Multiple bridges sharing an inner corner endpoint are allowed — the
+// inner cell can have a bridge to outer-A AND a bridge to outer-B (two
+// possibilities). Each anchor cell still holds at most one bridge.
 export function canPlaceMost(ring, idx, bridgesOnBoard) {
   if (bridgesOnBoard?.[`${ring}-${idx}`]) return null;
   const dest = getBridgeParallel(ring, idx);
@@ -261,10 +272,13 @@ export function canPlaceMost(ring, idx, bridgesOnBoard) {
 // Blocked if the cell is an active player's HOME-exit cell (spawn point) on
 // either ring. Finish-entry cells are NOT blocked — the rule prohibits placing
 // only on the exit FROM home, not the entry INTO finish.
-export function canPlaceSpecial(ring, idx, activeColors) {
+// `allowExit` lets BRIDGE bypass the EXIT-cell guard (Rule 9.2 new — BRIDGE
+// can be placed on an EXIT cell, other specials cannot).
+export function canPlaceSpecial(ring, idx, activeColors, allowExit = false) {
   const { r, c } = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
   const cell = GRID[r][c];
   if (cell.type !== 'outer-path' && cell.type !== 'inner-path') return false;
+  if (allowExit) return true;
   const colors = activeColors || Object.keys(PLAYERS);
   for (const color of colors) {
     const p = PLAYERS[color];

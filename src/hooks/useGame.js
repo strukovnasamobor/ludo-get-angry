@@ -112,6 +112,51 @@ function findFigureInFinish(players, colorKey, lane, slot) {
   return null;
 }
 
+// ── Placement target calculation ───────────────────────────────────────────
+
+// True iff the figure's current cell is a legal target to place `specialType`.
+// Used by PLACE_SPECIAL and by the six-action UI to highlight placement spots.
+//
+// Rules:
+// - figure must be on a path/inner cell (not home, not finish)
+// - cell must not be a HOME-exit (canPlaceSpecial)
+// - for non-bridge specialType: cell must not host another non-bridge special
+// - for 'most': canPlaceMost (both endpoints free of bridges)
+// BRIDGE-coexistence: a non-bridge special on a cell with a bridge is allowed,
+// and a bridge on a cell with a non-bridge special is allowed.
+function getPlacementTarget(state, color, figId, specialType) {
+  const player = state.players.find(p => p.color === color);
+  if (!player) return null;
+  const fig = player.figures.find(f => f.id === figId);
+  if (!fig || typeof fig.pos !== 'object' || !fig.pos.ring) return null;
+  const { ring, idx } = fig.pos;
+  const activeColors = state.players.map(p => p.color);
+  if (!canPlaceSpecial(ring, idx, activeColors)) return null;
+  const spKey = `${ring}-${idx}`;
+  if (specialType === 'most') {
+    if (!canPlaceMost(ring, idx, state.bridgesOnBoard)) return null;
+    return { ring, idx };
+  }
+  if (state.specialsOnBoard[spKey]) return null;
+  return { ring, idx };
+}
+
+// All placement options for the current player on a 6-roll: cross-product of
+// (held special types) × (their own pieces on path cells legal for that type).
+export function getPlacementMoves(state) {
+  const player = state.players[state.currentPlayerIndex];
+  if (!player) return [];
+  const uniqueSpecials = [...new Set(player.specialsHeld)];
+  const results = [];
+  uniqueSpecials.forEach(specialType => {
+    player.figures.forEach(fig => {
+      const t = getPlacementTarget(state, player.color, fig.id, specialType);
+      if (t) results.push({ specialType, figId: fig.id, ring: t.ring, idx: t.idx });
+    });
+  });
+  return results;
+}
+
 // ── Valid move calculation ─────────────────────────────────────────────────
 
 export function getValidMoves(state, diceVal) {
@@ -319,10 +364,6 @@ function applyMove(state, move) {
   const mover = newPlayers.find(p => p.color === player.color);
   const fig = mover.figures.find(f => f.id === move.figId);
 
-  // Snapshot specials before any detonation side-effects so afterMove uses the
-  // pre-move hand (returned bombs shouldn't unlock a placement opportunity).
-  const preMoveSpecials = [...mover.specialsHeld];
-
   // Clear flags on move
   fig.rewindNext = false;
   fig.stopActive = false;
@@ -359,150 +400,80 @@ function applyMove(state, move) {
     if (armed.rewindArmed) { armed.rewindNext = true;   armed.rewindArmed = false; }
   });
 
-  // Check for capture (only on path, not on finish/home)
-  let duelState = null;
-  let specialTrigger = null;
-
-  if ((move.type === 'move' || move.type === 'exit') && !move.rewind) {
-    const ring = move.ring;
-    const idx = move.idx;
-    const occupied = findFigureOnCell(newPlayers.filter(p => p.color !== player.color), ring, idx);
-    if (occupied) {
-      // Dynamic rule 8: dice duel
-      duelState = {
-        atkColor: player.color,
-        defColor: occupied.player.color,
-        ring,
-        idx,
-        figId: move.figId,
-        defFigId: occupied.figure.id,
-        atkRoll: null,
-        defRoll: null,
-      };
-    }
-  }
-
-  if (move.type === 'move' || move.type === 'exit') {
-    // Check special square — applies even on rewind moves
-    const spKey = `${move.ring}-${move.idx}`;
-    if (!duelState && newSpecials[spKey]) {
-      const sp = newSpecials[spKey];
-      const isSelfZamjena = sp.type === 'zamjena' && sp.placedBy === player.color;
-      specialTrigger = {
-        type: isSelfZamjena ? 'zamjena-own' : sp.type,
-        ring: move.ring,
-        idx: move.idx,
-        figId: move.figId,
-        playerColor: player.color,
-        placedBy: sp.placedBy,
-      };
-    } else if (!duelState && move.type !== 'exit') {
-      // Bridge: check direct cell first, then parallel cell.
-      // Only offer crossing if own piece doesn't already occupy the destination.
-      const parallel = getBridgeParallel(move.ring, move.idx);
-      if (state.bridgesOnBoard[spKey]) {
-        const destBlockedByOwn = parallel && !!findFigureOnCell(
-          newPlayers.filter(p => p.color === player.color), parallel.ring, parallel.idx
-        );
-        if (!destBlockedByOwn) {
-          specialTrigger = {
-            type: 'most',
-            ring: move.ring,
-            idx: move.idx,
-            figId: move.figId,
-            playerColor: player.color,
-            placedBy: state.bridgesOnBoard[spKey].placedBy,
-          };
-        }
-      } else if (parallel) {
-        const parallelKey = `${parallel.ring}-${parallel.idx}`;
-        if (state.bridgesOnBoard[parallelKey]) {
-          const destBlockedByOwn = !!findFigureOnCell(
-            newPlayers.filter(p => p.color === player.color), parallel.ring, parallel.idx
-          );
-          if (!destBlockedByOwn) {
-            specialTrigger = {
-              type: 'most',
-              ring: move.ring,
-              idx: move.idx,
-              figId: move.figId,
-              playerColor: player.color,
-              placedBy: state.bridgesOnBoard[parallelKey].placedBy,
-            };
-          }
-        }
-      }
-    }
-  }
-
   // Check win
   const winner = newPlayers.find(isWinner);
   if (winner) {
     return { ...state, players: newPlayers, specialsOnBoard: newSpecials, winner: winner.color, phase: 'game-over' };
   }
 
-  if (duelState) {
-    return { ...state, players: newPlayers, specialsOnBoard: newSpecials, duelState, phase: 'duel' };
+  // Finish lane: no specials / bridges / duels apply — straight to afterMove.
+  if (move.type === 'finish') {
+    return afterMove({ ...state, players: newPlayers, specialsOnBoard: newSpecials }, move);
   }
 
-  if (specialTrigger) {
-    return applySpecialTrigger({ ...state, players: newPlayers, specialsOnBoard: newSpecials }, specialTrigger);
-  }
-
-  return afterMove({ ...state, players: newPlayers, specialsOnBoard: newSpecials }, move, preMoveSpecials);
+  // Path moves and exits route through the unified landing precedence
+  // (duel → BOMB → SWAP → bridge → REWIND/STOP/KOCKA → afterMove).
+  return applyLandingPrecedence(
+    { ...state, specialsOnBoard: newSpecials },
+    newPlayers,
+    move.ring,
+    move.idx,
+    move.figId,
+    player.color,
+    false,
+  );
 }
 
-function afterMove(state, move, preMoveSpecials = null) {
-  const player = state.players[state.currentPlayerIndex];
-  const effectiveSpecials = preMoveSpecials ?? player.specialsHeld;
-  const hasSpecials = effectiveSpecials.length > 0;
-  const spKey = `${move.ring}-${move.idx}`;
-  const activeColors = state.players.map(p => p.color);
-  // Rule 9.2: no special — BRIDGE included — may be placed on a HOME-exit cell.
-  // Bridge endpoints occupy BOTH the placed-on cell and its parallel cell.
-  const parallel = move.ring ? getBridgeParallel(move.ring, move.idx) : null;
-  const parallelHasBridge = parallel && !!state.bridgesOnBoard[`${parallel.ring}-${parallel.idx}`];
-  const validPlacement = (move.type === 'move' || move.type === 'exit') &&
-    !state.specialsOnBoard[spKey] &&
-    !state.bridgesOnBoard[spKey] &&
-    !parallelHasBridge &&
-    hasSpecials &&
-    canPlaceSpecial(move.ring, move.idx, activeColors);
-
-  if (validPlacement) {
-    return { ...state, phase: 'placing-special', lastMoveRing: move.ring, lastMoveIdx: move.idx };
-  }
-
-  // Bonus roll if dice was 6
+function afterMove(state, _move) {
+  // Placement no longer happens after a move (Rule 9.2 new — gated on 6-roll
+  // via 'six-action'). Just branch on bonusRoll: Stage B if a 6 was rolled,
+  // else advance to the next player.
   if (state.bonusRoll) {
     return { ...state, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1 };
   }
-
   return advanceTurn(state);
 }
 
-// Shared post-landing logic for moves that teleport a piece (MOST bridge, KOCKA).
-// Checks collision → duel, then special trigger, then normal afterMove.
-function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
+// Shared landing logic with the Rule-9 precedence:
+//   1. Duel on collision
+//   2. BOMB always fires (regardless of bridge)
+//   3. SWAP fires if placer has eligible target; own-SWAP shows info
+//   4. Bridge (direct or parallel) → Stay/Cross modal
+//   5. Other special (REWIND/STOP/KOCKA) on this cell
+//   6. No trigger → afterMove
+//
+// `skipBridge` is set after a Cross teleport so we don't re-prompt and loop
+// back across the same bridge.
+function applyLandingPrecedence(state, newPlayers, ring, idx, figId, playerColor, skipBridge = false) {
+  // 1. Duel on collision
   const occupied = findFigureOnCell(newPlayers.filter(p => p.color !== playerColor), ring, idx);
   if (occupied) {
     const duelSt = {
       atkColor: playerColor,
       defColor: occupied.player.color,
-      ring,
-      idx,
-      figId,
+      ring, idx, figId,
       defFigId: occupied.figure.id,
-      atkRoll: null,
-      defRoll: null,
+      atkRoll: null, defRoll: null,
     };
     return { ...state, players: newPlayers, duelState: duelSt, phase: 'duel' };
   }
+
   const spKey = `${ring}-${idx}`;
-  if (state.specialsOnBoard[spKey]) {
-    const sp = state.specialsOnBoard[spKey];
-    // ZAMJENA placed by the same player who landed on it — show info, then afterMove on dismiss
-    if (sp.type === 'zamjena' && sp.placedBy === playerColor) {
+  const sp = state.specialsOnBoard[spKey];
+  const bridgeHere = state.bridgesOnBoard[spKey];
+  const parallel = getBridgeParallel(ring, idx);
+  const parallelBridge = parallel ? state.bridgesOnBoard[`${parallel.ring}-${parallel.idx}`] : null;
+
+  // 2. BOMB pre-empts everything
+  if (sp && sp.type === 'bomba') {
+    return applySpecialTrigger({ ...state, players: newPlayers }, {
+      type: 'bomba', ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
+    });
+  }
+
+  // 3. SWAP: own-field shows info; otherwise fires if placer has any eligible piece
+  if (sp && sp.type === 'zamjena') {
+    if (sp.placedBy === playerColor) {
       return {
         ...state,
         players: newPlayers,
@@ -510,59 +481,45 @@ function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
         specialTrigger: { type: 'zamjena-own', ring, idx, figId, playerColor, placedBy: sp.placedBy },
       };
     }
-    const trigger = {
-      type: sp.type,
-      ring,
-      idx,
-      figId,
-      playerColor,
-      placedBy: sp.placedBy,
-      source: 'landing',
-    };
-    return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
+    const placer = newPlayers.find(p => p.color === sp.placedBy);
+    const eligible = !!placer && placer.figures.some(f =>
+      typeof f.pos === 'object' && f.pos.ring
+      && !(f.pos.ring === ring && f.pos.idx === idx)
+    );
+    if (eligible) {
+      return applySpecialTrigger({ ...state, players: newPlayers }, {
+        type: 'zamjena', ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
+      });
+    }
+    // Not eligible — SWAP fizzles; fall through to bridge / others.
   }
-  // Bridge: check direct cell first, then parallel cell
-  const parallel = getBridgeParallel(ring, idx);
-  const bridgeKey = spKey;
-  if (state.bridgesOnBoard[bridgeKey]) {
-    // Only offer crossing if the destination isn't occupied by the mover's own piece
+
+  // 4. Bridge — Stay/Cross modal. Skipped after a Cross teleport.
+  if (!skipBridge && (bridgeHere || parallelBridge)) {
     const destBlockedByOwn = parallel && !!findFigureOnCell(
       newPlayers.filter(p => p.color === playerColor), parallel.ring, parallel.idx
     );
     if (!destBlockedByOwn) {
-      const trigger = {
-        type: 'most',
-        ring,
-        idx,
-        figId,
-        playerColor,
-        placedBy: state.bridgesOnBoard[bridgeKey].placedBy,
-        source: 'landing',
-      };
-      return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
+      const placedBy = (bridgeHere ?? parallelBridge).placedBy;
+      return applySpecialTrigger({ ...state, players: newPlayers }, {
+        type: 'most', ring, idx, figId, playerColor, placedBy, source: 'landing',
+      });
     }
   }
-  if (parallel) {
-    const parallelKey = `${parallel.ring}-${parallel.idx}`;
-    if (state.bridgesOnBoard[parallelKey]) {
-      const destBlockedByOwn = !!findFigureOnCell(
-        newPlayers.filter(p => p.color === playerColor), parallel.ring, parallel.idx
-      );
-      if (!destBlockedByOwn) {
-        const trigger = {
-          type: 'most',
-          ring,
-          idx,
-          figId,
-          playerColor,
-          placedBy: state.bridgesOnBoard[parallelKey].placedBy,
-          source: 'landing',
-        };
-        return applySpecialTrigger({ ...state, players: newPlayers }, trigger);
-      }
-    }
+
+  // 5. REWIND / STOP / KOCKA on this cell (no bridge involved)
+  if (sp && (sp.type === 'rewind' || sp.type === 'stop' || sp.type === 'kocka')) {
+    return applySpecialTrigger({ ...state, players: newPlayers }, {
+      type: sp.type, ring, idx, figId, playerColor, placedBy: sp.placedBy, source: 'landing',
+    });
   }
+
   return afterMove({ ...state, players: newPlayers }, { type: 'move', ring, idx });
+}
+
+// Back-compat wrapper for older call sites (KOCKA teleport, ZAMJENA swap).
+function afterLanding(state, newPlayers, ring, idx, figId, playerColor) {
+  return applyLandingPrecedence(state, newPlayers, ring, idx, figId, playerColor, false);
 }
 
 function applySpecialTrigger(state, trigger) {
@@ -626,20 +583,17 @@ function applyDuelResolve(state, atkRoll, defRoll) {
   const attackerWon = atkRoll > defRoll;
   const newState = { ...state, players: newPlayers, duelState: null };
   if (!attackerWon) return advanceTurn(newState);
-  const spKey = `${duelState.ring}-${duelState.idx}`;
-  if (newState.specialsOnBoard[spKey]) {
-    const trigger = {
-      type: newState.specialsOnBoard[spKey].type,
-      ring: duelState.ring,
-      idx: duelState.idx,
-      figId: duelState.figId,
-      playerColor: duelState.atkColor,
-      placedBy: newState.specialsOnBoard[spKey].placedBy,
-      source: 'landing',
-    };
-    return applySpecialTrigger(newState, trigger);
-  }
-  return afterMove(newState, { type: 'move', ring: duelState.ring, idx: duelState.idx });
+  // Attacker stays on the cell — resolve any special/bridge stack via the
+  // unified precedence (BOMB > SWAP > BRIDGE > REWIND/STOP/KOCKA).
+  return applyLandingPrecedence(
+    newState,
+    newPlayers,
+    duelState.ring,
+    duelState.idx,
+    duelState.figId,
+    duelState.atkColor,
+    false,
+  );
 }
 
 function reducer(state, action) {
@@ -662,7 +616,9 @@ function reducer(state, action) {
           // Got 6 or used all rolls
           const moves = getValidMoves({ ...state, diceValue: val }, val);
           if (val === 6 && moves.length > 0) {
-            return { ...state, diceValue: val, rollsLeft: newRollsLeft, phase: 'moving', bonusRoll: true };
+            // Stuck player on a 6 with moves → six-action (no placements possible
+            // since all pieces are in HOME or FINISH).
+            return { ...state, diceValue: val, rollsLeft: newRollsLeft, phase: 'six-action', bonusRoll: true };
           }
           if (newRollsLeft <= 0) {
             return { ...state, diceValue: val, rollsLeft: 0, phase: 'no-moves' };
@@ -675,10 +631,18 @@ function reducer(state, action) {
       const moves = getValidMoves({ ...state, diceValue: val }, val);
       const bonus = val === 6;
 
-      if (moves.length === 0) {
-        if (bonus) {
+      if (bonus) {
+        // 6-roll: player picks ONE of [move | place | pickup] in 'six-action'.
+        // Need at least one move OR at least one legal placement to enter the
+        // phase — otherwise it's just an idle bonus roll.
+        const placements = getPlacementMoves({ ...state, diceValue: val });
+        if (moves.length === 0 && placements.length === 0) {
           return { ...state, diceValue: val, bonusRoll: true, phase: 'rolling' };
         }
+        return { ...state, diceValue: val, bonusRoll: true, phase: 'six-action' };
+      }
+
+      if (moves.length === 0) {
         return { ...state, diceValue: val, bonusRoll: false, phase: 'no-moves' };
       }
 
@@ -700,21 +664,19 @@ function reducer(state, action) {
     case 'PLACE_SPECIAL': {
       const { ring, idx, specialType } = action;
       const player = state.players[state.currentPlayerIndex];
-      const placeKey = `${ring}-${idx}`;
 
-      // Rule 9.2: cell must not already host a special (or bridge endpoint).
-      if (state.specialsOnBoard[placeKey]) return state;
-      if (state.bridgesOnBoard[placeKey])  return state;
+      // Rule 9.2 (new): placement is gated on a 6-roll → 'six-action' phase.
+      if (state.phase !== 'six-action') return state;
+      if (!player.specialsHeld.includes(specialType)) return state;
 
-      // Rule 9.2: every special — BRIDGE included — must not be placed on
-      // an active player's HOME-exit cell.
-      if (!canPlaceSpecial(ring, idx, state.players.map(p => p.color))) return state;
-      if (specialType === 'most') {
-        if (!canPlaceMost(ring, idx, state.bridgesOnBoard)) return state;
-        // Bridge's parallel endpoint must also not host a non-bridge special.
-        const dest = getBridgeParallel(ring, idx);
-        if (dest && state.specialsOnBoard[`${dest.ring}-${dest.idx}`]) return state;
-      }
+      // Cell must be the current cell of one of the placer's own pieces.
+      const placerFig = player.figures.find(f => figureOnPath(f.pos, ring, idx));
+      if (!placerFig) return state;
+
+      // Validate target via shared helper (handles BRIDGE-coexistence loosening).
+      const target = getPlacementTarget(state, player.color, placerFig.id, specialType);
+      if (!target) return state;
+
       const newPlayers = deepCopyPlayers(state.players).map(p => {
         if (p.color !== player.color) return p;
         const i = p.specialsHeld.indexOf(specialType);
@@ -723,7 +685,8 @@ function reducer(state, action) {
       });
       const spKey = `${ring}-${idx}`;
 
-      // Bridges go into bridgesOnBoard (permanent); all other specials into specialsOnBoard
+      // Bridges go into bridgesOnBoard, others into specialsOnBoard.
+      // BRIDGE-coexistence with a non-bridge special is allowed (Rule 9.2 new).
       const newSpecials = specialType === 'most'
         ? state.specialsOnBoard
         : { ...state.specialsOnBoard, [spKey]: { type: specialType, placedBy: player.color } };
@@ -731,65 +694,38 @@ function reducer(state, action) {
         ? { ...state.bridgesOnBoard, [spKey]: { placedBy: player.color } }
         : state.bridgesOnBoard;
 
-      // Arm the placer's own piece standing on a BOMB/STOP/REWIND square so it
-      // gets one turn to move freely. Failure to move it converts the armed
-      // flag in applyMove's promote-armed sweep. No modal at placement time
-      // for these — the warning instead pops on the placer's next turn (see
-      // GameBoard.jsx bomb/stop/rewind alerts).
+      // Arm the placer's own piece for BOMB/STOP/REWIND (silent armed pattern).
+      // The warning modal pops on the placer's next turn (bomb/stop/rewind alerts).
       if (specialType === 'bomba' || specialType === 'stop' || specialType === 'rewind') {
         const placer = newPlayers.find(p => p.color === player.color);
-        const placerFig = placer.figures.find(f => figureOnPath(f.pos, ring, idx));
-        if (placerFig) {
-          if (specialType === 'bomba')  placerFig.bombActive  = { placedBy: player.color };
-          if (specialType === 'stop')   placerFig.stopArmed   = true;
-          if (specialType === 'rewind') placerFig.rewindArmed = true;
+        const placerFigNew = placer.figures.find(f => f.id === placerFig.id);
+        if (placerFigNew) {
+          if (specialType === 'bomba')  placerFigNew.bombActive  = { placedBy: player.color };
+          if (specialType === 'stop')   placerFigNew.stopArmed   = true;
+          if (specialType === 'rewind') placerFigNew.rewindArmed = true;
         }
       }
 
-      // Check if figure on this cell is immediately affected (rule 9c)
-      const figHere = findFigureOnCell(newPlayers, ring, idx);
-      let nextState = { ...state, players: newPlayers, specialsOnBoard: newSpecials, bridgesOnBoard: newBridges, phase: 'moving' };
+      const baseState = { ...state, players: newPlayers, specialsOnBoard: newSpecials, bridgesOnBoard: newBridges };
 
-      if (figHere && figHere.player.color !== player.color) {
-        // Immediate activation on opponent's figure (landing-style effect).
-        nextState = applySpecialTrigger(nextState, {
+      // MOST / KOCKA on placer's own piece — activate immediately. After the
+      // user resolves the modal, the post-trigger flow returns to Stage B via
+      // afterMove's bonusRoll check (bonusRoll is still true here).
+      if (specialType === 'most' || specialType === 'kocka') {
+        return applySpecialTrigger(baseState, {
           type: specialType,
           ring,
           idx,
-          figId: figHere.figure.id,
-          playerColor: figHere.player.color,
-          placedBy: player.color,
-          source: 'landing',
-        });
-      } else if (
-        figHere
-        && figHere.player.color === player.color
-        // bomba/stop/rewind arm placer's piece silently (handled above);
-        // zamjena on self is meaningless. MOST + KOCKA still need user input.
-        && specialType !== 'bomba'
-        && specialType !== 'stop'
-        && specialType !== 'rewind'
-        && specialType !== 'zamjena'
-      ) {
-        // Rules 9.a, 9.b: BRIDGE / DICE "just activates" for placer's own piece.
-        nextState = applySpecialTrigger(nextState, {
-          type: specialType,
-          ring,
-          idx,
-          figId: figHere.figure.id,
-          playerColor: figHere.player.color,
+          figId: placerFig.id,
+          playerColor: player.color,
           placedBy: player.color,
           source: 'placement',
         });
       }
 
-      if (nextState.phase === 'moving') {
-        if (state.bonusRoll) {
-          return { ...nextState, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1 };
-        }
-        return advanceTurn(nextState);
-      }
-      return nextState;
+      // BOMB / STOP / REWIND (silent armed) or ZAMJENA (meaningless on self):
+      // exit to Stage B (bonus re-roll). Consume bonusRoll here.
+      return { ...baseState, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1, specialTrigger: null };
     }
 
     case 'RESOLVE_DUEL': {
@@ -820,6 +756,21 @@ function reducer(state, action) {
     case 'RESOLVE_MOST': {
       const { cross, trigger } = action;
       if (!cross) {
+        // Stay — if a non-bridge special exists on this cell (BRIDGE-coexistence
+        // under new Rule 9.2), trigger it now. BOMB/SWAP would have fired before
+        // the bridge modal, so only REWIND/STOP/KOCKA can remain.
+        const spKey = `${trigger.ring}-${trigger.idx}`;
+        const sp = state.specialsOnBoard[spKey];
+        if (sp && (sp.type === 'rewind' || sp.type === 'stop' || sp.type === 'kocka')) {
+          return applySpecialTrigger({ ...state, specialTrigger: null }, {
+            type: sp.type,
+            ring: trigger.ring, idx: trigger.idx,
+            figId: trigger.figId,
+            playerColor: trigger.playerColor,
+            placedBy: sp.placedBy,
+            source: 'landing',
+          });
+        }
         return afterMove({ ...state, specialTrigger: null }, { type: 'move', ring: trigger.ring, idx: trigger.idx });
       }
       const dest = getBridgeParallel(trigger.ring, trigger.idx);
@@ -840,46 +791,17 @@ function reducer(state, action) {
       const fig = mover.figures.find(f => f.id === trigger.figId);
       fig.pos = { ring: dest.ring, idx: dest.idx };
 
-      const baseState = { ...state, specialTrigger: null, players: newPlayers };
-
-      // Check for duel at destination, but skip special re-trigger —
-      // the destination may be the bridge cell itself and would loop back.
-      const occupied = findFigureOnCell(
-        newPlayers.filter(p => p.color !== trigger.playerColor),
-        dest.ring, dest.idx
+      // Resolve specials at destination using the unified precedence. Skip the
+      // bridge step at destination to avoid looping right back across.
+      return applyLandingPrecedence(
+        { ...state, specialTrigger: null },
+        newPlayers,
+        dest.ring,
+        dest.idx,
+        trigger.figId,
+        trigger.playerColor,
+        true,
       );
-      if (occupied) {
-        return {
-          ...baseState,
-          duelState: {
-            atkColor: trigger.playerColor,
-            defColor: occupied.player.color,
-            ring: dest.ring,
-            idx: dest.idx,
-            figId: trigger.figId,
-            defFigId: occupied.figure.id,
-            atkRoll: null,
-            defRoll: null,
-          },
-          phase: 'duel',
-        };
-      }
-
-      // Trigger special on destination cell (skip bridge check to prevent infinite loop)
-      const destKey = `${dest.ring}-${dest.idx}`;
-      if (baseState.specialsOnBoard[destKey]) {
-        return applySpecialTrigger(baseState, {
-          type: baseState.specialsOnBoard[destKey].type,
-          ring: dest.ring,
-          idx: dest.idx,
-          figId: trigger.figId,
-          playerColor: trigger.playerColor,
-          placedBy: baseState.specialsOnBoard[destKey].placedBy,
-          source: 'landing',
-        });
-      }
-
-      return afterMove(baseState, { type: 'move', ring: dest.ring, idx: dest.idx });
     }
 
     case 'RESOLVE_KOCKA': {
@@ -1183,8 +1105,12 @@ export function useGame(setupPlayers) {
   const continueAfterTie = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame = useCallback(() => dispatch({ type: 'START_GAME' }), []);
 
-  const validMoves = state.phase === 'moving'
+  const validMoves = (state.phase === 'moving' || state.phase === 'six-action')
     ? getValidMoves(state, state.diceValue)
+    : [];
+
+  const placementMoves = state.phase === 'six-action'
+    ? getPlacementMoves(state)
     : [];
 
   const currentPlayer = state.players[state.currentPlayerIndex];
@@ -1193,6 +1119,7 @@ export function useGame(setupPlayers) {
     state,
     currentPlayer,
     validMoves,
+    placementMoves,
     rollDice,
     selectMove,
     skipPlaceSpecial,

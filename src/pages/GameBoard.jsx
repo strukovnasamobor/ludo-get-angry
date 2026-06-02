@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useGame } from '../hooks/useGame.js';
 import { usePinchZoom } from '../hooks/usePinchZoom.js';
-import { canPlaceMost, OUTER_PATH, INNER_PATH, PLAYERS } from '../data/boardLayout.js';
+import { OUTER_PATH, INNER_PATH } from '../data/boardLayout.js';
 import Board from '../components/Board/Board.jsx';
 import PlayerPanel from '../components/PlayerPanel.jsx';
 import Modal from '../components/Modal.jsx';
@@ -35,7 +35,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   }, []);
 
   const localHook = useGame(setup?.players || []);
-  const { state, currentPlayer, validMoves, rollDice, selectMove,
+  const { state, currentPlayer, validMoves, placementMoves, rollDice, selectMove,
     skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
     dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
   } = gameHook ?? localHook;
@@ -56,7 +56,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const prevStopArmedKeyRef = useRef(null);
   const prevRewindArmedKeyRef = useRef(null);
   const prevSkipTurnKeyRef = useRef(null);
-  const autoSkipPlacingRef = useRef(false);
 
   useEffect(() => {
     if (!isMyTurn || !state.players?.length) {
@@ -105,27 +104,11 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const isInitialRoll = phase === 'initial-roll';
   const isRolling = phase === 'rolling';
   const isMoving = phase === 'moving';
-  const isPlacing = phase === 'placing-special';
+  const isSixAction = phase === 'six-action';
   const isDuel = phase === 'duel';
   const isSpecial = phase === 'special-trigger';
   const isOver = phase === 'game-over';
   const isNoMoves = phase === 'no-moves';
-
-  // Whether MOST can be placed at the current landed cell
-  const mostCanPlace = isPlacing && state.lastMoveRing
-    ? !!canPlaceMost(state.lastMoveRing, state.lastMoveIdx, state.bridgesOnBoard)
-    : true;
-
-  // Spawn points only allow bridge placement
-  const isSpawnPointLanding = isPlacing && state.lastMoveRing != null
-    ? state.players.some(p => {
-        const pd = PLAYERS[p.color];
-        return pd && (
-          (state.lastMoveRing === 'outer' && state.lastMoveIdx === pd.exitOuter) ||
-          (state.lastMoveRing === 'inner' && state.lastMoveIdx === pd.exitInner)
-        );
-      })
-    : false;
 
   // Track when player is in stuck 3-roll mode
   useEffect(() => {
@@ -133,21 +116,35 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     if (!isRolling) setInStuckRolls(false);
   }, [state.rollsLeft, isRolling]);
 
+  // Clear placement chip selection whenever six-action ends (placed, moved,
+  // picked up, or turn advanced).
+  useEffect(() => {
+    if (!isSixAction && selectedSpecialType) setSelectedSpecialType(null);
+  }, [isSixAction]);
+
   // Keep auto-advance ref current so interval closure always calls latest callbacks
   autoAdvanceRef.current = () => {
     if (!isMyTurn) return;
-    if (phase === 'placing-special') skipPlaceSpecial();
-    else if (phase === 'rolling') {
-      // Don't auto-roll: count this as a missed turn and skip.
+    if (phase === 'rolling') {
+      // Stage B (bonus re-roll) or normal rolling — missed roll = skip.
       skipPlayerTurn?.(currentPlayer.color);
     }
     else if (phase === 'moving') {
       if (validMoves.length > 0) {
-        autoSkipPlacingRef.current = true; // any auto-move should not pause to place a special
         const m = validMoves[Math.floor(Math.random() * validMoves.length)];
         selectMove(m);
       } else {
         endTurn();
+      }
+    }
+    else if (phase === 'six-action') {
+      // Stage A timeout: random legal move if any; otherwise fall through to
+      // Stage B (no skip-count increment per Rule 9 new).
+      if (validMoves.length > 0) {
+        const m = validMoves[Math.floor(Math.random() * validMoves.length)];
+        selectMove(m);
+      } else {
+        skipPlaceSpecial();
       }
     }
     else if (phase === 'special-trigger') {
@@ -214,16 +211,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     return () => clearTimeout(id);
   }, [phase, state.duelState?.atkRoll, state.duelState?.defRoll]);
 
-  // If an auto-move (from 'moving' timeout) lands on a placement-eligible cell,
-  // skip the placement panel immediately instead of waiting another full timer.
-  useEffect(() => {
-    if (!isMyTurn) { autoSkipPlacingRef.current = false; return; }
-    if (!autoSkipPlacingRef.current) return;
-    if (phase !== 'placing-special') return;
-    autoSkipPlacingRef.current = false;
-    skipPlaceSpecial();
-  }, [phase, isMyTurn]);
-
   // Auto-dismiss "own zamjena" info after 2.5s
   useEffect(() => {
     if (!isSpecial || state.specialTrigger?.type !== 'zamjena-own') return;
@@ -254,20 +241,39 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         })
     : [];
 
-  const moveableFigures = isMoving
-    ? validMoves.map(m => ({ figId: m.figId, playerColor: currentPlayer.color }))
-    : isZamjena
-      ? zamjenaEligibleFigs
-      : [];
+  const moveAndSixActionPhase = isMoving || isSixAction;
 
-  const validTargets = isMoving
+  // Which special types can be placed at all right now (any legal target piece).
+  const placeableSpecials = new Set((placementMoves || []).map(pm => pm.specialType));
+
+  // Placement targets for the currently selected special chip during six-action.
+  // Each option is a (figId, ring, idx) — the cell of one of the placer's pieces
+  // that's a legal target for `selectedSpecialType`.
+  const activePlacementOptions = isSixAction && selectedSpecialType
+    ? (placementMoves || []).filter(pm => pm.specialType === selectedSpecialType)
+    : [];
+
+  const placementTargets = activePlacementOptions.map(pm => ({ ring: pm.ring, idx: pm.idx }));
+
+  // Moveable figures highlight. During six-action with a special chip selected,
+  // show only the placement-target figures (so the player sees where they can
+  // place). Otherwise show the regular move targets.
+  const moveableFigures = (isMoving || isSixAction) && !selectedSpecialType
+    ? validMoves.map(m => ({ figId: m.figId, playerColor: currentPlayer.color }))
+    : isSixAction && selectedSpecialType
+      ? activePlacementOptions.map(pm => ({ figId: pm.figId, playerColor: currentPlayer.color }))
+      : isZamjena
+        ? zamjenaEligibleFigs
+        : [];
+
+  const validTargets = moveAndSixActionPhase && !selectedSpecialType
     ? validMoves.filter(m => m.type !== 'pickup' && m.type !== 'pickup-bridge').map(m => {
         if (m.type === 'move' || m.type === 'exit') return { ring: m.ring, idx: m.idx };
         if (m.type === 'finish') return { lane: m.lane, color: m.color, slot: m.slot };
         return null;
       }).filter(Boolean)
-    : isPlacing && state.lastMoveRing
-      ? [{ ring: state.lastMoveRing, idx: state.lastMoveIdx }]
+    : isSixAction && selectedSpecialType
+      ? placementTargets
       : [];
 
   function handleFigureClick(playerColor, figId) {
@@ -278,7 +284,17 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
       }
       return;
     }
-    if (!isMoving) return;
+    // Placement during six-action: clicking a placement-target piece places the
+    // selected special on that piece's current cell.
+    if (isSixAction && selectedSpecialType) {
+      if (playerColor !== currentPlayer.color) return;
+      const opt = activePlacementOptions.find(pm => pm.figId === figId);
+      if (!opt) return;
+      placeSpecial(opt.ring, opt.idx, selectedSpecialType);
+      setSelectedSpecialType(null);
+      return;
+    }
+    if (!moveAndSixActionPhase) return;
     if (playerColor !== currentPlayer.color) return;
     const figureMoves = validMoves.filter(m => m.figId === figId);
     if (figureMoves.length === 0) return;
@@ -304,7 +320,9 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const [exitChoiceFig, setExitChoiceFig] = useState(null);
   const [pickupChoiceMoves, setPickupChoiceMoves] = useState(null);
 
-  const pickupMoves = isMoving ? validMoves.filter(m => m.type === 'pickup' || m.type === 'pickup-bridge') : [];
+  const pickupMoves = moveAndSixActionPhase
+    ? validMoves.filter(m => m.type === 'pickup' || m.type === 'pickup-bridge')
+    : [];
   const hasPickup = pickupMoves.length > 0;
 
   function handlePickupBtn() {
@@ -318,8 +336,23 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   function handleCellClick({ cell }) {
     if (!isMyTurn) return;
-    // Tap a target cell to select move
-    if (isMoving) {
+    // Six-action with a special chip selected: clicking a placement-target cell
+    // places the special on that piece.
+    if (isSixAction && selectedSpecialType) {
+      let opt = null;
+      if (cell.type === 'outer-path') {
+        opt = activePlacementOptions.find(pm => pm.ring === 'outer' && pm.idx === cell.outerIdx);
+      } else if (cell.type === 'inner-path') {
+        opt = activePlacementOptions.find(pm => pm.ring === 'inner' && pm.idx === cell.innerIdx);
+      }
+      if (opt) {
+        placeSpecial(opt.ring, opt.idx, selectedSpecialType);
+        setSelectedSpecialType(null);
+      }
+      return;
+    }
+    // Tap a target cell to select move (works for both moving and six-action).
+    if (moveAndSixActionPhase) {
       if (cell.type === 'outer-path') {
         const move = validMoves.find(m => m.ring === 'outer' && m.idx === cell.outerIdx);
         if (move) selectMove(move);
@@ -331,7 +364,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         if (move) selectMove(move);
       }
     }
-
   }
 
   function handleDuelRoll(who) {
@@ -355,7 +387,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           {currentPlayer.name}
           {phase === 'rolling' && ' - 🎲'}
           {phase === 'moving' && ` - ${t('gamePhaseMoving')}`}
-          {phase === 'placing-special' && ` - ${t('gamePhasePlacing')}`}
+          {phase === 'six-action' && ` - ${t('gamePhaseMoving')}`}
           {phase === 'duel' && ` - ${t('gamePhaseDuel')}`}
         </span>
         <div className="game-topbar-actions">
@@ -430,31 +462,18 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           currentPlayerIndex={state.currentPlayerIndex}
           phase={phase}
           isMyTurn={isMyTurn}
+          placeableSpecials={placeableSpecials}
           onSelectSpecialForPlace={type => {
-            if (!isMyTurn) return;
-            if (type === 'most' && !mostCanPlace) return;
-            if (type !== 'most' && isSpawnPointLanding) return;
+            if (!isMyTurn || !isSixAction) return;
+            if (!placeableSpecials.has(type)) return;
             setSelectedSpecialType(type === selectedSpecialType ? null : type);
           }}
           selectedSpecial={selectedSpecialType}
-          mostCanPlace={mostCanPlace}
-          spawnPointOnly={isSpawnPointLanding}
           hasPickup={hasPickup}
           onPickup={handlePickupBtn}
-          onSkipPlaceSpecial={() => { if (!isMyTurn) return; setSelectedSpecialType(null); skipPlaceSpecial(); }}
-          onConfirmPlaceSpecial={() => {
-            if (!isMyTurn || !selectedSpecialType || !state.lastMoveRing) return;
-            placeSpecial(state.lastMoveRing, state.lastMoveIdx, selectedSpecialType);
-            setSelectedSpecialType(null);
-          }}
           t={t}
         />
         <div className="game-controls">
-          {isPlacing && selectedSpecialType === 'most' && !mostCanPlace && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'center', margin: '2px 0' }}>
-              🌉 {t('mostCannotPlace')}
-            </p>
-          )}
           {isMoving && validMoves.length === 0 && isMyTurn && (
             <button className="btn btn-secondary" onClick={skipPlaceSpecial}>
               {t('gameNoMoves')} →

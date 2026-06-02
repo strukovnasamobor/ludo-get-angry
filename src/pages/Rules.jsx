@@ -104,28 +104,23 @@ export function RulesContent({ lang }) {
       </Rule>
       <SubRule num="9.1.">
         {hr
-          ? 'Ako je broj igrača jednak 4 ili manji tada svaki igrač dobiva 2 posebna polja svake vrste na početku igre, a ako j veći od 4 tada svaki igrač dobiva 1 posebno polje svake vrste.'
-          : 'If there are 4 or fewer players, each player starts with 2 of each type of special square. If there are more than 4 players, each player starts with 1 of each type of special square.'}
+          ? 'Ako je broj igrača na početku igre jednak 4 ili manji tada svaki igrač dobiva 2 posebna polja svake vrste na početku igre, a ako je veći od 4 tada svaki igrač dobiva 1 posebno polje svake vrste.'
+          : 'If there are 4 or fewer players at the start of the game, each player starts with 2 of each type of special square. If there are more than 4 players, each player starts with 1 of each type of special square.'}
       </SubRule>
       <SubRule num="9.2.">
         {hr
-          ? 'Nakon što igrač koji je na potezu odigra s figuricom, na to polje na kojem je stala figurica igrač može postaviti posebno polje koje ima u ruci - ako to polje već nije posebno i nije polje izlaska iz kuće. Za MOST mora postojati paralelni kvadratić bez specijalnog polja i MOST ne smije prelaziti preko kvadratića HOME.'
-          : 'After the active player moves a piece, they may place a special square from their hand onto the square just landed - provided it is not already a special square and not the exit cell from home. For BRIDGE, a parallel cell without special cell must exist, and the BRIDGE may not cross over HOME cells.'}
+          ? 'Igrač koji je na potezu i dobio 6 može odabrati svoju figuricu i na to polje igrač može postaviti posebno polje koje ima ako to polje već nije posebno (osim MOSTA) i nije IZLAZ. Za MOST mora postojati paralelni kvadratić i ne smije prelaziti preko kvadratića HOME.'
+          : 'A player who rolls a 6 may choose one of their pieces and place a special square they own on that piece\'s current square, as long as it isn\'t already special (except for BRIDGE) or an EXIT. For BRIDGE, there must be a parallel square and it can\'t cross over any HOME square.'}
       </SubRule>
       <SubRule num="9.3.">
         {hr
-          ? 'Posebno polje se odmah aktivira za figuricu koja je na tom polju. Ako je postavljena bomba, ta figurica se u idućem potezu mora pomaknuti ili odlazi u svoj kvadratić HOME.'
-          : 'A placed special square activates immediately for the piece on that square. If a bomb is placed, the piece must move on its next turn or it returns to HOME.'}
+          ? 'Igrač koji je na potezu i dobio 6 može odabrati svoju figuricu koja se nalazi na nekom posebnom polju i uzeti to posebno polje za kasnije postavljanje. Igrač zatim ponovno baca kocku.'
+          : 'A player who rolls 6 may pick up any special square that his piece is currently standing on, taking it for later placement. The player then rolls again.'}
       </SubRule>
       <SubRule num="9.4.">
         {hr
-          ? 'Igrač koji je na potezu i dobio 6 može odabrati figuricu koja se nalazi na nekom posebnom polju i uzeti to posebno polje u ruku za kasnije postavljanje. Igrač zatim ponovno baca kocku.'
-          : 'A player who rolls 6 may pick up any special square that a piece is currently standing on, taking it into their hand for later placement. They then roll the dice again.'}
-      </SubRule>
-      <SubRule num="9.5.">
-        {hr
-          ? 'Posebno polje ostaje postavljeno do kraja igre ili dok ga neki igrač ne pokupi.'
-          : 'A special square remains on the board until the end of the game or until a player picks it up.'}
+          ? 'Posebno polje ostaje postavljeno do kraja igre ili dok ga neki igrač ne pokupi. Posebna polja igrača koji izbačen nakon 2 neodigrana poteza se uklanjaju.'
+          : 'A special square remains on the board until the end of the game or until a player picks it up. Special squares belonging to a player who is eliminated after 2 missed turns are removed.'}
       </SubRule>
       <div className="rules-specials">
         {specials.map((s, i) => (

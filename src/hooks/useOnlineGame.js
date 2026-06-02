@@ -1,7 +1,7 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { reducer, initState, getValidMoves } from './useGame';
+import { reducer, initState, getValidMoves, getPlacementMoves } from './useGame';
 
 export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameState) {
   // Lazy-init from the remote gameState when it already exists (rejoin into
@@ -82,11 +82,14 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
   const continueAfterTie   = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame          = useCallback(() => dispatch({ type: 'START_GAME' }), []);
 
-  const validMoves    = state.phase === 'moving' ? getValidMoves(state, state.diceValue) : [];
+  const validMoves    = (state.phase === 'moving' || state.phase === 'six-action')
+    ? getValidMoves(state, state.diceValue)
+    : [];
+  const placementMoves = state.phase === 'six-action' ? getPlacementMoves(state) : [];
   const currentPlayer = state.players[state.currentPlayerIndex];
 
   return {
-    state, currentPlayer, validMoves,
+    state, currentPlayer, validMoves, placementMoves,
     rollDice, selectMove, skipPlaceSpecial, placeSpecial,
     resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
     dismissSpecialInfo, endTurn, skipPlayerTurn, initialRoll, continueAfterTie, startGame,

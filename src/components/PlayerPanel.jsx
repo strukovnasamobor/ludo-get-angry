@@ -21,14 +21,14 @@ export default function PlayerPanel({
   isMyTurn = true,
   onSelectSpecialForPlace,
   selectedSpecial,
-  mostCanPlace,
-  spawnPointOnly,
-  onSkipPlaceSpecial,
-  onConfirmPlaceSpecial,
+  placeableSpecials,
   hasPickup,
   onPickup,
   t,
 }) {
+  const isSixAction = phase === 'six-action';
+  const isMoving = phase === 'moving';
+  const placeable = placeableSpecials || new Set();
   const current = players[currentPlayerIndex];
 
   // Tally figure positions for current player
@@ -61,44 +61,31 @@ export default function PlayerPanel({
           </div>
         </div>
         {(() => {
-          const showActions = isMyTurn && (phase === 'placing-special' || (phase === 'moving' && hasPickup));
+          const showPickup = isMyTurn && (isMoving || isSixAction) && hasPickup;
           return (
             <div
               className="panel-place-actions"
-              style={{ visibility: showActions ? 'visible' : 'hidden', pointerEvents: showActions ? 'auto' : 'none' }}
+              style={{ visibility: showPickup ? 'visible' : 'hidden', pointerEvents: showPickup ? 'auto' : 'none' }}
             >
               <button
                 className="panel-action-btn panel-action-btn--pickup"
                 onClick={onPickup}
-                style={{ visibility: (isMyTurn && phase === 'moving' && hasPickup) ? 'visible' : 'hidden', pointerEvents: (isMyTurn && phase === 'moving' && hasPickup) ? 'auto' : 'none' }}
               >⬆</button>
-              <button
-                className="panel-action-btn panel-action-btn--confirm"
-                onClick={onConfirmPlaceSpecial}
-                style={{ visibility: (isMyTurn && phase === 'placing-special' && selectedSpecial) ? 'visible' : 'hidden', pointerEvents: (isMyTurn && phase === 'placing-special' && selectedSpecial) ? 'auto' : 'none' }}
-              >✓</button>
-              <button
-                className="panel-action-btn panel-action-btn--skip"
-                onClick={onSkipPlaceSpecial}
-                style={{ visibility: (isMyTurn && phase === 'placing-special') ? 'visible' : 'hidden', pointerEvents: (isMyTurn && phase === 'placing-special') ? 'auto' : 'none' }}
-              >✕</button>
             </div>
           );
         })()}
       </div>
 
-      {/* Specials in hand — always rendered to keep panel height constant */}
+      {/* Specials in hand — clickable to place during six-action (a 6 was rolled). */}
       <div className="panel-specials">
         {Object.entries(specialCounts).map(([type, count]) => {
-          const isDisabled = phase === 'placing-special' && (
-            (type === 'most' && mostCanPlace === false) ||
-            (type !== 'most' && spawnPointOnly)
-          );
+          const canPlace = isSixAction && placeable.has(type);
+          const isDisabled = isSixAction && !canPlace;
           return (
             <button
               key={type}
-              className={`special-chip ${selectedSpecial === type ? 'special-chip--selected' : ''} ${phase === 'placing-special' ? 'special-chip--active' : ''} ${isDisabled ? 'special-chip--disabled' : ''}`}
-              onClick={() => phase === 'placing-special' && onSelectSpecialForPlace?.(type)}
+              className={`special-chip ${selectedSpecial === type ? 'special-chip--selected' : ''} ${isSixAction ? 'special-chip--active' : ''} ${isDisabled ? 'special-chip--disabled' : ''}`}
+              onClick={() => { if (canPlace && isMyTurn) onSelectSpecialForPlace?.(type); }}
               title={isDisabled ? t('mostCannotField') : t(SPECIAL_KEYS[type])}
             >
               {SPECIAL_ICONS[type]}{count > 1 ? <span className="special-chip-count">×{count}</span> : ''}

@@ -7,10 +7,10 @@ const SPECIALS = {
   hr: [
     { emoji: '🌉', name: 'MOST',    desc: 'Igrač čija je figurica aktivirala ili stala na MOST odlučuje hoće li figurica ostati ili s njom prelazi most.' },
     { emoji: '🎲', name: 'KOCKA',   desc: 'Igrač čija je figurica aktivirala ili stala na KOCKU baca dvije kocke i mora pokušati pomaknuti figuricu za dobiveni zbroj.' },
-    { emoji: '⏪', name: 'REWIND',  desc: 'Figurica koja je aktivirala REWIND mora se pomaknuti na idućem potezu ili će se kretati suprotno od kazaljke na satu na potezu kada igrač odluči pomaknuti tu figuricu. Figurica koja stana na REWIND kreće se u suprotnom smjeru od kazaljke na satu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom krugu.' },
-    { emoji: '💣', name: 'BOMBA',   desc: 'Figurica koja je aktivirala BOMBU mora se pomaknuti na idućem potezu ili će biti vraćena u svoj kvadratić HOME. Figurica koja stane na BOMBU vraća se u svoj kvadratić HOME i igrač koji je stao na bombu uzima je u ruku za ponovno postavljanje.' },
+    { emoji: '⏪', name: 'UNATRAG', desc: 'Figurica koja je aktivirala UNATRAG mora se pomaknuti na idućem potezu ili će se kretati suprotno od kazaljke na satu na potezu kada igrač odluči pomaknuti tu figuricu. Figurica koja stana na UNATRAG kreće se u suprotnom smjeru od kazaljke na satu. Figurica ne može ići izvan svojeg izlaza u unutarnjem ili vanjskom krugu.' },
+    { emoji: '💣', name: 'BOMBA',   desc: 'Figurica koja je aktivirala BOMBU mora se pomaknuti na idućem potezu ili će biti vraćena u svoj kvadratić KUĆA. Figurica koja stane na BOMBU vraća se u svoj kvadratić KUĆA i igrač koji je stao na bombu uzima je u ruku za ponovno postavljanje.' },
     { emoji: '⏸️', name: 'STOP',    desc: 'Figurica koja je aktivirala STOP mora se pomaknuti na idućem potezu ili će se moći pomaknuti samo kada igrač dobije 1. Figurica koja je stala na STOP smije se kretati samo kada igrač dobije 1.' },
-    { emoji: '🔄', name: 'ZAMJENA', desc: 'Igrač ćija je figurica stala na ZAMJENU bira slobodnu figuricu (izvan kvadratića HOME i FINISH) boje igrača koji je postavio to "posebno polje". Ako nema slobodnih figurica te boje zamjena se ne izvršava.' },
+    { emoji: '🔄', name: 'ZAMJENA', desc: 'Igrač čija je figurica stala na ZAMJENU bira slobodnu figuricu (izvan kvadratića KUĆA i KRAJ) boje igrača koji je postavio to "posebno polje". Ako nema slobodnih figurica te boje zamjena se ne izvršava.' },
   ],
   en: [
     { emoji: '🌉', name: 'BRIDGE', desc: 'The player whose piece just activated or has landed on the BRIDGE decides whether to stay or cross to the parallel ring with that piece.' },
@@ -59,8 +59,8 @@ export function RulesContent({ lang }) {
     <div className="rules-content">
       <Rule num="1.">
         {hr
-          ? 'Na početku igre svaki igrač (2 do 8 igrača) ima 4 figurice iste boje smještene u kvadrat HOME te iste boje. Cilj je smjestiti sve figurice u kućicu iste boje označene brojevima 1 do 4 kretanjem po mapi u smjeru kazaljke na satu.'
-          : 'Each player (2-8) starts with 4 pieces of their color in their HOME area. The goal is to move all pieces into the numbered finish slots (1-4) by traveling clockwise around the board.'}
+          ? 'Na početku igre svaki igrač (2 do 8 igrača) ima 4 figurice iste boje smještene u kvadrat HOME te iste boje. Cilj je smjestiti sve figurice u kvadratiće KRAJ iste boje označene brojevima 1 do 4 kretanjem po mapi u smjeru kazaljke na satu.'
+          : 'Each player (2-8) starts with 4 pieces of their color in their HOME area. The goal is to move all pieces into the numbered FINISH slots (1-4) of their color by traveling clockwise around the board.'}
       </Rule>
       <Rule num="2.">
         {hr
@@ -69,18 +69,18 @@ export function RulesContent({ lang }) {
       </Rule>
       <Rule num="3.">
         {hr
-          ? 'Ako igrač koji je na potezu ima sve figurice u kvadratu HOME ili su uzastopno poredani u kućicama od 4 prema niže tada igrač ima 3 bacanja da dobije 6.'
-          : 'If all of a player\'s pieces are in HOME, or consecutively placed in finish slots counting down from 4, that player gets 3 rolls to try to get a 6.'}
+          ? 'Ako igrač koji je na potezu ima sve figurice u kvadratu KUĆA ili su uzastopno poredani u kvadratićima KRAJ od 4 prema niže tada igrač ima 3 bacanja da dobije 6.'
+          : 'If all of a player\'s pieces are in HOME, or consecutively placed in FINISH slots counting down from 4, that player gets 3 rolls to try to get a 6.'}
       </Rule>
       <Rule num="4.">
         {hr
-          ? 'Figuricom se može izaći ako se dobije 6. Svaka boja ima dva moguća izlaza: jedan u manjem krugu, drugi u većem krugu.'
-          : 'A piece can exit HOME only on a roll of 6. Each color has two exits: one on the inner ring (shorter route) and one on the outer ring (longer route).'}
+          ? 'Figuricom se može izaći ako se dobije 6. Svaka boja ima dva kvadratića IZLAZ: jedan u manjem krugu, drugi u većem krugu.'
+          : 'A piece can exit HOME only on a roll of 6. Each color has two slots EXIT: one on the inner ring (shorter route) and one on the outer ring (longer route).'}
       </Rule>
       <Rule num="5.">
         {hr
-          ? 'Svako polje broji kao jedan. Pomakni jednu figuricu u smjeru kazaljke na satu za cijeli broj s kocke. U unutarnjem krugu figurica može ući u svoje FINISH polje (1–4) ako točnim brojem stane na slobodno polje, inače staje prije svojeg izlaska iz kuće. U vanjskom krugu figurica staje prije svojeg izlaska iz kuće i može doći do FINISH-a samo preko MOSTA na unutarnji krug. Ako nema mogućeg poteza, na redu je sljedeći igrač.'
-          : 'Every square counts as one step. Move one piece clockwise by the full dice value. In the inner ring, a piece may enter its own FINISH slot (1–4) if the exact roll lands it on an empty slot; otherwise it stops before its own home exit. In the outer ring, a piece stops before its own home exit and must cross a BRIDGE to reach FINISH. If no valid move exists, the next player takes their turn.'}
+          ? 'Svako polje broji kao jedan. Pomakni jednu figuricu u smjeru kazaljke na satu za cijeli broj s kocke. U unutarnjem krugu figurica može ući u svoj kvadratić KRAJ (1–4) ako točnim brojem stane na slobodni kvadratić, inače staje prije svojeg kvadratića IZLAZ. U vanjskom krugu figurica staje prije svojeg kvadratića IZLAZ i može doći do kvadratića KRAJ samo preko MOSTA na unutarnji krug. Ako nema mogućeg poteza, na redu je sljedeći igrač.'
+          : 'Every square counts as one step. Move one piece clockwise by the full dice value. In the inner ring, a piece may enter its own FINISH slot (1–4) if the exact roll lands it on an empty slot; otherwise it stops before its own EXIT slot. In the outer ring, a piece stops before its own EXIT slot and must cross a BRIDGE to reach FINISH slots. If no valid move exists, the next player takes their turn.'}
       </Rule>
       <Rule num="6.">
         {hr
@@ -94,12 +94,12 @@ export function RulesContent({ lang }) {
       </Rule>
       <Rule num="8.">
         {hr
-          ? 'Ako figurica stane na isto polje gdje je figurica druge boje tada igrači čije su te figurice bacanjem kocke određuju koja figurica odlazi u svoj kvadratić HOME. Figurica čiji igrač dobije veći broj ostaje, a ako su brojevi isti igrači ponovno bacaju kocke dok netko ne dobije veći broj.'
+          ? 'Ako figurica stane na isto polje gdje je figurica druge boje tada igrači čije su te figurice bacanjem kocke određuju koja figurica odlazi u svoj kvadratić KUĆA. Figurica čiji igrač dobije veći broj ostaje, a ako su brojevi isti igrači ponovno bacaju kocke dok netko ne dobije veći broj.'
           : 'If a piece lands on a square with an opponent\'s piece, both players roll the dice - the higher roll stays on the square. If tied, both re-roll until one gets a higher number.'}
       </Rule>
       <Rule num="9.">
         {hr
-          ? 'Posebna polja su: MOST, KOCKA, REWIND, BOMBA, STOP i ZAMJENA.'
+          ? 'Posebna polja su: MOST, KOCKA, UNATRAG, BOMBA, STOP i ZAMJENA.'
           : 'Special squares are: BRIDGE, DICE, REWIND, BOMB, STOP and SWAP.'}
       </Rule>
       <SubRule num="9.1.">
@@ -134,7 +134,7 @@ export function RulesContent({ lang }) {
       </div>
       <Rule num="10.">
         {hr
-          ? 'Igrač koji prvi poreda svoje figurice u FINISH kućice označene od 1 do 4 je pobijedio.'
+          ? 'Igrač koji prvi poreda svoje figurice u kućice KRAJ označene od 1 do 4 je pobijedio.'
           : 'The first player to fill all FINISH slots 1-4 with their pieces wins.'}
       </Rule>
     </div>

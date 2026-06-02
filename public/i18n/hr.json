@@ -81,7 +81,7 @@
 
   "specialMost": "MOST",
   "specialKocka": "KOCKA",
-  "specialRewind": "REWIND",
+  "specialRewind": "UNATRAG",
   "specialBomba": "BOMBA",
   "specialStop": "STOP",
   "specialZamjena": "ZAMJENA",
@@ -98,10 +98,10 @@
   "bombAlertMsg": "Pomakni figuricu koja je aktivirala BOMBU ili će se ona vratiti u kučice HOME.",
   "stopAlertTitle": "STOP aktiviran!",
   "stopAlertMsg": "Pomakni figuricu koja je aktivirala STOP u ovom potezu, inače će se moći kretati samo kada baciš 1.",
-  "rewindAlertTitle": "REWIND aktiviran!",
-  "rewindAlertMsg": "Pomakni figuricu koja je aktivirala REWIND u ovom potezu, inače će biti prisiljena ići u suprotnom smjeru na idućem potezu.",
+  "rewindAlertTitle": "UNATRAG aktiviran!",
+  "rewindAlertMsg": "Pomakni figuricu koja je aktivirala UNATRAG u ovom potezu, inače će biti prisiljena ići u suprotnom smjeru na idućem potezu.",
   "specialStopMsg": "Stop! Figurica se može kretati samo za 1.",
-  "specialRewindMsg": "Rewind! Sljedeći potez ide unazad.",
+  "specialRewindMsg": "Unatrag! Sljedeći potez ide unazad.",
   "specialKockaMsg": "Kocka! Baci dvije kocke.",
 
   "rulesTitle": "Pravila igre",

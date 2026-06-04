@@ -39,6 +39,10 @@
   "gameSkip": "Preskoči postavljanje",
   "gameWin": "Pobijedio!",
   "gameWinMsg": "je pobijedio igru!",
+  "gameFinishedPlaceTitle": "Cilj!",
+  "gameFinishedPlaceMsg": "završio na mjestu",
+  "gameFinalResultsTitle": "Konačni poredak",
+  "gameDNF": "Nije završio",
   "gamePlayAgain": "Igraj ponovo",
   "gameMainMenu": "Glavni izbornik",
 

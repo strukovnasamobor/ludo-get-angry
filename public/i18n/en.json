@@ -39,6 +39,10 @@
   "gameSkip": "Skip placement",
   "gameWin": "Winner!",
   "gameWinMsg": "has won the game!",
+  "gameFinishedPlaceTitle": "Finish!",
+  "gameFinishedPlaceMsg": "finished in place",
+  "gameFinalResultsTitle": "Final Standings",
+  "gameDNF": "Did not finish",
   "gamePlayAgain": "Play Again",
   "gameMainMenu": "Main Menu",
 

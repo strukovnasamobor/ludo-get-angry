@@ -56,6 +56,8 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const prevStopArmedKeyRef = useRef(null);
   const prevRewindArmedKeyRef = useRef(null);
   const prevSkipTurnKeyRef = useRef(null);
+  const prevStandingsLenRef = useRef(0);
+  const [finishQueue, setFinishQueue] = useState([]);
 
   useEffect(() => {
     if (!isMyTurn || !state.players?.length) {
@@ -85,6 +87,19 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     if (rewindKey && rewindKey !== prevRewindArmedKeyRef.current) setShowRewindAlert(true);
     prevRewindArmedKeyRef.current = rewindKey;
   }, [state.currentPlayerIndex, state.players, isMyTurn]);
+
+  // Finish announcement queue: when state.standings grows, enqueue the new
+  // entries so we can pop one modal per finisher in order. Fires on every
+  // client (no isMyTurn gate) — all players see the celebration.
+  useEffect(() => {
+    const prev = prevStandingsLenRef.current;
+    const curr = state.standings?.length ?? 0;
+    if (curr > prev) {
+      const newEntries = state.standings.slice(prev);
+      setFinishQueue(q => [...q, ...newEntries]);
+    }
+    prevStandingsLenRef.current = curr;
+  }, [state.standings]);
 
   // Skip warning: when the active player has skipCount > 0 (they missed their
   // last turn) and it's their turn again, pop a one-time "Final warning" modal.
@@ -681,16 +696,55 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
         </Modal>
       )}
 
-      {/* Win modal */}
-      {isOver && state.winner && (
-        <Modal title={t('gameWin')}>
-          <p style={{ textAlign: 'center', fontSize: '2rem' }}>🏆</p>
-          <p style={{ textAlign: 'center' }}>
-            <strong style={{ color: COLOR_HEX[state.winner] }}>
-              {state.players.find(p => p.color === state.winner)?.name}
-            </strong>{' '}
-            {t('gameWinMsg')}
-          </p>
+      {/* Finish announcement — one modal per finisher, queued in order. */}
+      {finishQueue.length > 0 && !isOver && (() => {
+        const color = finishQueue[0];
+        const placeIdx = (state.standings || []).indexOf(color);
+        const place = placeIdx + 1;
+        const medal = ['🥇','🥈','🥉'][placeIdx] ?? '🎖️';
+        const name = state.players.find(p => p.color === color)?.name
+                    ?? state.initialNames?.[color]
+                    ?? color;
+        return (
+          <Modal title={t('gameFinishedPlaceTitle')} onClose={() => setFinishQueue(q => q.slice(1))}>
+            <p style={{ textAlign: 'center', fontSize: '2.5rem', margin: 0 }}>{medal}</p>
+            <p style={{ textAlign: 'center' }}>
+              <strong style={{ color: COLOR_HEX[color] }}>{name}</strong>{' '}
+              {t('gameFinishedPlaceMsg')} {place}.
+            </p>
+            <button className="btn btn-primary" onClick={() => setFinishQueue(q => q.slice(1))}>{t('ok')}</button>
+          </Modal>
+        );
+      })()}
+
+      {/* Final results — full standings + DNFs */}
+      {isOver && (() => {
+        const standings = state.standings || [];
+        const allColors = state.allColors || state.players.map(p => p.color);
+        const names = state.initialNames || {};
+        const playerNameOf = (c) =>
+          state.players.find(p => p.color === c)?.name ?? names[c] ?? c;
+        const dnfColors = allColors.filter(c =>
+          !standings.includes(c) && !state.players.some(p => p.color === c)
+        );
+        return (
+        <Modal title={t('gameFinalResultsTitle')}>
+          <p style={{ textAlign: 'center', fontSize: '2rem', margin: 0 }}>🏆</p>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '4px', margin: '8px 0' }}>
+            {standings.map((color, i) => {
+              const medal = ['🥇','🥈','🥉'][i] ?? '🎖️';
+              return (
+                <div key={color} style={{ textAlign: 'center' }}>
+                  <strong style={{ color: COLOR_HEX[color] }}>{medal} {i + 1}. {playerNameOf(color)}</strong>
+                </div>
+              );
+            })}
+            {dnfColors.map(color => (
+              <div key={color} style={{ textAlign: 'center', opacity: 0.5 }}>
+                <strong style={{ color: COLOR_HEX[color] }}>— {t('gameDNF')} — {playerNameOf(color)}</strong>
+              </div>
+            ))}
+          </div>
           <button className="btn btn-primary" onClick={() => navigate(playAgainPath)}>
             {t('gamePlayAgain')}
           </button>
@@ -698,7 +752,8 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
             {t('gameMainMenu')}
           </button>
         </Modal>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -74,7 +74,14 @@ function initState(setupPlayers) {
     bridgesOnBoard: {},
     duelState: null,
     specialTrigger: null,
-    winner: null,
+    // Finish standings — colors in finish order. First entry = 1st place.
+    // Replaces the old single `winner` field. Game-over fires when every
+    // remaining (non-DNF) player has been appended.
+    standings: [],
+    // Snapshots taken at START_GAME so DNF names can still be rendered after a
+    // kicked player is removed from `players`.
+    allColors: [],
+    initialNames: {},
     // Initial roll state (rule 2)
     initialRollOrder: setupPlayers.map(sp => sp.color),
     initialRolls: {},     // colorKey → value rolled this round
@@ -336,7 +343,19 @@ export function getValidMoves(state, diceVal) {
 
 
 function advanceTurn(state) {
-  let nextIdx = (state.currentPlayerIndex + 1) % state.players.length;
+  const n = state.players.length;
+  if (n === 0) return { ...state, phase: 'game-over' };
+  const standings = state.standings || [];
+  let nextIdx = (state.currentPlayerIndex + 1) % n;
+  // Skip past any player whose color is already in the finish standings.
+  for (let i = 0; i < n; i++) {
+    if (!standings.includes(state.players[nextIdx].color)) break;
+    nextIdx = (nextIdx + 1) % n;
+  }
+  if (standings.includes(state.players[nextIdx].color)) {
+    // Everyone in standings — defensive (applyMove should have already ended).
+    return { ...state, phase: 'game-over' };
+  }
   const nextPlayer = state.players[nextIdx];
   const stuck = isAllStuck(nextPlayer);
   return {
@@ -474,11 +493,28 @@ function applyMove(state, move) {
     if (armed.rewindArmed) { armed.rewindNext = true;   armed.rewindArmed = false; }
   });
 
-  // Check win
-  const winner = newPlayers.find(isWinner);
-  if (winner) {
-    return { ...state, players: newPlayers, specialsOnBoard: newSpecials, winner: winner.color, phase: 'game-over' };
+  // Check finish — first finisher gets 1st place, but the game continues so
+  // others can race for 2nd / 3rd / etc. Game-over only when every remaining
+  // (non-DNF) player has been placed.
+  const finisher = newPlayers.find(p =>
+    isWinner(p) && !(state.standings || []).includes(p.color)
+  );
+  let newStandings = state.standings || [];
+  if (finisher) {
+    newStandings = [...newStandings, finisher.color];
+    const allDone = newPlayers.every(p => newStandings.includes(p.color));
+    if (allDone) {
+      return {
+        ...state,
+        players: newPlayers,
+        specialsOnBoard: newSpecials,
+        standings: newStandings,
+        phase: 'game-over',
+      };
+    }
   }
+  // Propagate the updated standings through whichever post-move path runs.
+  state = { ...state, standings: newStandings };
 
   // Finish lane: no specials / bridges / duels apply — straight to afterMove.
   if (move.type === 'finish') {
@@ -1069,12 +1105,18 @@ function reducer(state, action) {
     case 'START_GAME': {
       const winnerIdx = state.players.findIndex(p => p.color === state.initialRollWinner);
       const winner = state.players[winnerIdx];
+      // Snapshot the starting roster so DNF entries can still render names
+      // after REMOVE_PLAYER strips kicked players from `players`.
+      const allColors = state.players.map(p => p.color);
+      const initialNames = Object.fromEntries(state.players.map(p => [p.color, p.name]));
       return {
         ...state,
         phase: 'rolling',
         currentPlayerIndex: winnerIdx,
         rollsLeft: isAllStuck(winner) ? 3 : 1,
         initialRollWinner: null,
+        allColors,
+        initialNames,
       };
     }
 
@@ -1100,14 +1142,28 @@ function reducer(state, action) {
         Object.entries(state.bridgesOnBoard).filter(([, v]) => v.placedBy !== color)
       );
 
-      if (newPlayers.length <= 1) {
+      const standings = state.standings || [];
+      if (newPlayers.length === 0) {
         return {
           ...state,
           players: newPlayers,
           specialsOnBoard: newSpecials,
           bridgesOnBoard: newBridges,
           currentPlayerIndex: 0,
-          winner: newPlayers[0]?.color ?? null,
+          phase: 'game-over',
+          duelState: null,
+          specialTrigger: null,
+        };
+      }
+      // Sole survivor who has ALREADY finished → game-over. If they haven't
+      // finished yet, the user wants them to keep playing alone until they do.
+      if (newPlayers.length === 1 && standings.includes(newPlayers[0].color)) {
+        return {
+          ...state,
+          players: newPlayers,
+          specialsOnBoard: newSpecials,
+          bridgesOnBoard: newBridges,
+          currentPlayerIndex: 0,
           phase: 'game-over',
           duelState: null,
           specialTrigger: null,

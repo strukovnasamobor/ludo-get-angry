@@ -185,7 +185,10 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   };
 
   // Reset and start 30s countdown whenever a meaningful state change occurs
-  const stateKey = `${state.currentPlayerIndex}-${phase}-${state.diceValue}-${state.rollsLeft}-${state.duelState?.atkRoll ?? ''}-${state.duelState?.defRoll ?? ''}-${state.specialTrigger?.d1 ?? ''}`;
+  // Include the active player's skipCount so the timer re-arms after every
+  // SKIP_PLAYER_TURN — needed for the lone-survivor case where advanceTurn
+  // loops right back to the same player and no other field would change.
+  const stateKey = `${state.currentPlayerIndex}-${phase}-${state.diceValue}-${state.rollsLeft}-${state.duelState?.atkRoll ?? ''}-${state.duelState?.defRoll ?? ''}-${state.specialTrigger?.d1 ?? ''}-${state.players[state.currentPlayerIndex]?.skipCount ?? 0}`;
   useEffect(() => {
     if (isOver || isInitialRoll) return;
     setTimeLeft(30);

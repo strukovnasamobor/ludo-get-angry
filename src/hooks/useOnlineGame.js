@@ -78,6 +78,7 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
   const dismissSpecialInfo = useCallback(() => dispatch({ type: 'DISMISS_SPECIAL_INFO' }), []);
   const endTurn            = useCallback(() => dispatch({ type: 'END_TURN' }), []);
   const skipPlayerTurn     = useCallback((color) => dispatch({ type: 'SKIP_PLAYER_TURN', color }), []);
+  const removePlayer       = useCallback((color) => dispatch({ type: 'REMOVE_PLAYER', color }), []);
   const initialRoll        = useCallback(() => dispatch({ type: 'INITIAL_ROLL' }), []);
   const continueAfterTie   = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame          = useCallback(() => dispatch({ type: 'START_GAME' }), []);
@@ -92,6 +93,6 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
     state, currentPlayer, validMoves, placementMoves,
     rollDice, selectMove, skipPlaceSpecial, placeSpecial,
     resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
-    dismissSpecialInfo, endTurn, skipPlayerTurn, initialRoll, continueAfterTie, startGame,
+    dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
   };
 }

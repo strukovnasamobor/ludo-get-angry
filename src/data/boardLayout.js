@@ -179,7 +179,7 @@ function buildGrid() {
 export const GRID = buildGrid();
 
 // Special square types
-export const SPECIAL_TYPES = ['most', 'kocka', 'rewind', 'bomba', 'stop', 'zamjena'];
+export const SPECIAL_TYPES = ['bridge', 'dice', 'rewind', 'bomb', 'stop', 'swap'];
 
 // Distribute specials (rule 9.1):
 //   2–4 players → 2 of each type per player

@@ -66,13 +66,13 @@
 
   "menuFooter": "2 – 8 igrača",
 
-  "zamjenaNoFigs": "Nema slobodnih figurica za zamjenu.",
-  "zamjenaFig": "Figurica",
-  "zamjenaSkip": "Preskoči",
-  "zamjenaOwnField": "Ovo je tvoje vlastito polje ZAMJENA - nema efekta.",
+  "swapNoFigs": "Nema slobodnih figurica za zamjenu.",
+  "swapFig": "Figurica",
+  "swapSkip": "Preskoči",
+  "swapOwnField": "Ovo je tvoje vlastito polje ZAMJENA - nema efekta.",
 
-  "mostCannotPlace": "MOST nije moguć - nema slobodnog paralelnog polja",
-  "mostCannotField": "MOST nije moguć na ovom polju",
+  "bridgeCannotPlace": "MOST nije moguć - nema slobodnog paralelnog polja",
+  "bridgeCannotField": "MOST nije moguć na ovom polju",
 
   "pickupChoiceTitle": "Koje polje pokupiti?",
   "pickupSpecial": "Specijalno polje",
@@ -83,26 +83,26 @@
   "duelLoser": "odlazi kući",
   "duelRoll": "Baci kocku za dvoboj",
 
-  "specialMost": "MOST",
-  "specialKocka": "KOCKA",
+  "specialBridge": "MOST",
+  "specialDice": "KOCKA",
   "specialRewind": "UNATRAG",
-  "specialBomba": "BOMBA",
+  "specialBomb": "BOMBA",
   "specialStop": "STOP",
-  "specialZamjena": "ZAMJENA",
+  "specialSwap": "ZAMJENA",
 
-  "specialMostQ": "Ostani na polju ili prijeđi most?",
-  "specialMostStay": "Ostani",
-  "specialMostCross": "Prijeđi most",
+  "specialBridgeQ": "Ostani na polju ili prijeđi most?",
+  "specialBridgeStay": "Ostani",
+  "specialBridgeCross": "Prijeđi most",
   "bridgeDirectionQ": "Odaberi smjer mosta",
   "bridgeDirTop": "Gore",
   "bridgeDirLeft": "Lijevo",
   "bridgeDirRight": "Desno",
   "bridgeDirBottom": "Dolje",
 
-  "specialZamjenaTitle": "Zamjena figurice",
-  "specialZamjenaRoll": "Baci kocku za odabir boje",
+  "specialSwapTitle": "Zamjena figurice",
+  "specialSwapRoll": "Baci kocku za odabir boje",
 
-  "specialBombaMsg": "Bum! Figurica je otišla kući.",
+  "specialBombMsg": "Bum! Figurica je otišla kući.",
   "bombAlertTitle": "Bomba aktivirana!",
   "bombAlertMsg": "Pomakni figuricu koja je aktivirala BOMBU ili će se ona vratiti u kučice HOME.",
   "stopAlertTitle": "STOP aktiviran!",
@@ -111,7 +111,7 @@
   "rewindAlertMsg": "Pomakni figuricu koja je aktivirala UNATRAG u ovom potezu, inače će biti prisiljena ići u suprotnom smjeru na idućem potezu.",
   "specialStopMsg": "Stop! Figurica se može kretati samo za 1.",
   "specialRewindMsg": "Unatrag! Sljedeći potez ide unazad.",
-  "specialKockaMsg": "Kocka! Baci dvije kocke.",
+  "specialDiceMsg": "Kocka! Baci dvije kocke.",
 
   "rulesTitle": "Pravila igre",
 

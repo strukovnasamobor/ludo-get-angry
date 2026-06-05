@@ -164,19 +164,19 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     }
     else if (phase === 'special-trigger') {
       const tr = state.specialTrigger;
-      if (tr?.type === 'kocka' && tr.d1 == null) {
+      if (tr?.type === 'dice' && tr.d1 == null) {
         kockaSetRoll(Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1);
-      } else if (tr?.type === 'zamjena') {
+      } else if (tr?.type === 'swap') {
         if (zamjenaEligibleFigs.length > 0) {
           const pick = zamjenaEligibleFigs[Math.floor(Math.random() * zamjenaEligibleFigs.length)];
           resolveZamjena(tr, pick.playerColor, pick.figId);
         } else {
           resolveZamjena(tr, null, null);
         }
-      } else if (tr?.type === 'most') {
+      } else if (tr?.type === 'bridge') {
         // Default to Stay on timeout (safe — no teleport).
         resolveMost(false, tr);
-      } else if (tr?.type !== 'kocka') {
+      } else if (tr?.type !== 'dice') {
         dismissSpecialInfo();
       }
     }
@@ -231,7 +231,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   // Auto-dismiss "own zamjena" info after 2.5s
   useEffect(() => {
-    if (!isSpecial || state.specialTrigger?.type !== 'zamjena-own') return;
+    if (!isSpecial || state.specialTrigger?.type !== 'swap-own') return;
     const id = setTimeout(dismissSpecialInfo, 2500);
     return () => clearTimeout(id);
   }, [isSpecial, state.specialTrigger?.type]);
@@ -244,7 +244,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     return () => clearTimeout(id);
   }, [ds?.atkRoll, ds?.defRoll, isMyTurn]);
 
-  const isZamjena = isSpecial && state.specialTrigger?.type === 'zamjena';
+  const isZamjena = isSpecial && state.specialTrigger?.type === 'swap';
   const zamjenaPlacer = isZamjena
     ? state.players.find(p => p.color === state.specialTrigger.placedBy && p.color !== state.specialTrigger.playerColor)
     : null;
@@ -407,6 +407,40 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   if (!gameHook && !setup) return null;
 
+  // Everyone was removed (e.g. two consecutive timeouts kicked the last player).
+  // Topbar/board/PlayerPanel can't render without a current player — show only
+  // the final-results modal driven by state.standings / state.allColors / state.initialNames.
+  if (!currentPlayer) {
+    const standings = state.standings || [];
+    const allColors = state.allColors || [];
+    const names = state.initialNames || {};
+    const dnfColors = allColors.filter(c => !standings.includes(c));
+    return (
+      <div className="gameboard-page page">
+        <Modal title={t('gameFinalResultsTitle')}>
+          <p style={{ textAlign: 'center', fontSize: '2rem', margin: 0 }}>🏆</p>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '4px', margin: '8px 0' }}>
+            {standings.map((color, i) => {
+              const medal = ['🥇','🥈','🥉'][i] ?? '🎖️';
+              return (
+                <div key={color} style={{ textAlign: 'center' }}>
+                  <strong style={{ color: COLOR_HEX[color] }}>{medal} {i + 1}. {names[color] ?? color}</strong>
+                </div>
+              );
+            })}
+            {dnfColors.map(color => (
+              <div key={color} style={{ textAlign: 'center', opacity: 0.5 }}>
+                <strong style={{ color: COLOR_HEX[color] }}>— {t('gameDNF')} — {names[color] ?? color}</strong>
+              </div>
+            ))}
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate(playAgainPath)}>{t('gamePlayAgain')}</button>
+          <button className="btn btn-secondary" onClick={() => navigate('/')}>{t('gameMainMenu')}</button>
+        </Modal>
+      </div>
+    );
+  }
+
   return (
     <div className="gameboard-page page">
       {/* Top bar */}
@@ -536,7 +570,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
           bottom: t('bridgeDirBottom') || 'Bottom',
         };
         return (
-          <Modal title={`🌉 ${t('specialMost')}`} onClose={() => setBridgeDirChoice(null)}>
+          <Modal title={`🌉 ${t('specialBridge')}`} onClose={() => setBridgeDirChoice(null)}>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
               {t('bridgeDirectionQ') || 'Choose bridge direction'}
             </p>
@@ -545,7 +579,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
                 key={`${o.anchorRing}-${o.anchorIdx}`}
                 className="btn btn-secondary"
                 onClick={() => {
-                  placeSpecial(o.ring, o.idx, 'most', o.anchorRing, o.anchorIdx);
+                  placeSpecial(o.ring, o.idx, 'bridge', o.anchorRing, o.anchorIdx);
                   setBridgeDirChoice(null);
                   setSelectedSpecialType(null);
                 }}
@@ -559,7 +593,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
       {/* Pickup choice modal */}
       {pickupChoiceMoves && (() => {
-        const SPECIAL_ICONS = { most: '🌉', kocka: '🎲', rewind: '⏪', bomba: '💣', stop: '⏸️', zamjena: '🔄' };
+        const SPECIAL_ICONS = { bridge: '🌉', dice: '🎲', rewind: '⏪', bomb: '💣', stop: '⏸️', swap: '🔄' };
         const multiFig = new Set(pickupChoiceMoves.map(m => m.figId)).size > 1;
         return (
           <Modal title={t('pickupChoiceTitle')} onClose={() => setPickupChoiceMoves(null)}>
@@ -575,7 +609,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
                   className="btn btn-secondary"
                   onClick={() => { selectMove(m); setPickupChoiceMoves(null); }}
                 >
-                  {multiFig ? `${t('zamjenaFig')} ${m.figId + 1} - ${fieldLabel}` : fieldLabel}
+                  {multiFig ? `${t('swapFig')} ${m.figId + 1} - ${fieldLabel}` : fieldLabel}
                 </button>
               );
             })}
@@ -624,7 +658,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
       })()}
 
       {/* Special trigger modal — zamjena handled by the board strip below */}
-      {isSpecial && state.specialTrigger && state.specialTrigger.type !== 'zamjena' && (
+      {isSpecial && state.specialTrigger && state.specialTrigger.type !== 'swap' && (
         <SpecialModal
           trigger={state.specialTrigger}
           players={state.players}
@@ -766,34 +800,34 @@ const ZAMJENA_COLOR_HEX = {
 function ZamjenaStrip({ trigger, placer, eligibleFigs, players, isMyTurn, onSelect, onSkip, t }) {
   const currentPlayer = players.find(p => p.color === trigger.playerColor);
   return (
-    <div className="zamjena-strip">
-      <div className="zamjena-strip-info">
-        <span className="zamjena-strip-icon">🔄</span>
-        <span className="zamjena-strip-label">{t('specialZamjena')}</span>
+    <div className="swap-strip">
+      <div className="swap-strip-info">
+        <span className="swap-strip-icon">🔄</span>
+        <span className="swap-strip-label">{t('specialSwap')}</span>
         {currentPlayer && !isMyTurn && (
-          <span className="zamjena-strip-waiting">({currentPlayer.name})</span>
+          <span className="swap-strip-waiting">({currentPlayer.name})</span>
         )}
       </div>
-      <div className="zamjena-strip-figs">
+      <div className="swap-strip-figs">
         {eligibleFigs.length === 0 && (
-          <span className="zamjena-strip-empty">{t('zamjenaNoFigs')}</span>
+          <span className="swap-strip-empty">{t('swapNoFigs')}</span>
         )}
         {eligibleFigs.map(f => (
           <button
             key={f.figId}
-            className="zamjena-fig-btn"
+            className="swap-fig-btn"
             style={{ background: ZAMJENA_COLOR_HEX[f.playerColor] }}
             onClick={() => isMyTurn && onSelect(f.playerColor, f.figId)}
             disabled={!isMyTurn}
           >
-            <span className="zamjena-fig-num">{f.figId + 1}</span>
-            <span className="zamjena-fig-coord">{f.row},{f.col}</span>
+            <span className="swap-fig-num">{f.figId + 1}</span>
+            <span className="swap-fig-coord">{f.row},{f.col}</span>
           </button>
         ))}
       </div>
       {eligibleFigs.length === 0 && (
         <button
-          className="btn btn-ghost zamjena-skip-btn"
+          className="btn btn-ghost swap-skip-btn"
           onClick={() => isMyTurn && onSkip()}
           disabled={!isMyTurn}
         >✕</button>
@@ -834,9 +868,9 @@ function KockaModal({ t, trigger, players, onKockaSetRoll, onKocka, isMyTurn = t
   );
 
   return (
-    <Modal title={`🎲 ${t('specialKocka')}`}>
+    <Modal title={`🎲 ${t('specialDice')}`}>
       {ownerLine}
-      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialKockaMsg')}</p>
+      <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialDiceMsg')}</p>
       {rolled ? (
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center', fontSize: '1.4rem', fontWeight: 900, margin: '8px 0' }}>
           <span>🎲 {trigger.d1}</span>
@@ -892,17 +926,17 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
     );
   }
 
-  if (trigger.type === 'bomba') {
+  if (trigger.type === 'bomb') {
     return (
-      <Modal title={`💣 ${t('specialBomba')}`}>
+      <Modal title={`💣 ${t('specialBomb')}`}>
         {ownerLine}
-        <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('specialBombaMsg')}</p>
+        <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('specialBombMsg')}</p>
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={onDismiss} disabled={!isMyTurn}>{t('ok')}</button>
       </Modal>
     );
   }
 
-  if (trigger.type === 'most') {
+  if (trigger.type === 'bridge') {
     const crossOptions = trigger.crossOptions || [];
     const myPath = trigger.ring === 'outer' ? OUTER_PATH : INNER_PATH;
     const myCell = myPath[trigger.idx];
@@ -922,20 +956,20 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
       bottom: t('bridgeDirBottom') || 'Bottom',
     };
     return (
-      <Modal title={`🌉 ${t('specialMost')}`}>
+      <Modal title={`🌉 ${t('specialBridge')}`}>
         {ownerLine}
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialMostQ')}</p>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t('specialBridgeQ')}</p>
         {isMyTurn ? (
           <>
-            <button className="btn btn-secondary" onClick={() => onMost(false)}>{t('specialMostStay')}</button>
+            <button className="btn btn-secondary" onClick={() => onMost(false)}>{t('specialBridgeStay')}</button>
             {crossOptions.length <= 1 ? (
-              <button className="btn btn-primary" onClick={() => onMost(true, 0)}>{t('specialMostCross')}</button>
+              <button className="btn btn-primary" onClick={() => onMost(true, 0)}>{t('specialBridgeCross')}</button>
             ) : (
               crossOptions.map((opt, i) => {
                 const d = dirOf(opt);
                 return (
                   <button key={i} className="btn btn-primary" onClick={() => onMost(true, i)}>
-                    {DIR_ICONS[d]} {t('specialMostCross')} ({DIR_LABELS[d]})
+                    {DIR_ICONS[d]} {t('specialBridgeCross')} ({DIR_LABELS[d]})
                   </button>
                 );
               })
@@ -950,15 +984,15 @@ function SpecialModal({ trigger, players, t, isMyTurn = true, onMost, onKockaSet
     );
   }
 
-  if (trigger.type === 'kocka') {
+  if (trigger.type === 'dice') {
     return <KockaModal key={`${trigger.ring}-${trigger.idx}`} t={t} trigger={trigger} players={players} onKockaSetRoll={onKockaSetRoll} onKocka={onKocka} isMyTurn={isMyTurn} />;
   }
 
-  if (trigger.type === 'zamjena-own') {
+  if (trigger.type === 'swap-own') {
     return (
-      <Modal title={`🔄 ${t('specialZamjena')}`}>
+      <Modal title={`🔄 ${t('specialSwap')}`}>
         {ownerLine}
-        <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('zamjenaOwnField')}</p>
+        <p style={{ textAlign: 'center', fontSize: '0.95rem' }}>{t('swapOwnField')}</p>
       </Modal>
     );
   }

@@ -80,7 +80,7 @@
   padding: 5px var(--sp-md);
 }
 
-.zamjena-strip {
+.swap-strip {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -90,36 +90,36 @@
   background: var(--bg-secondary);
 }
 
-.zamjena-strip-info {
+.swap-strip-info {
   display: flex;
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
 }
 
-.zamjena-strip-icon {
+.swap-strip-icon {
   font-size: 1rem;
 }
 
-.zamjena-strip-label {
+.swap-strip-label {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
-.zamjena-strip-waiting {
+.swap-strip-waiting {
   font-size: 0.75rem;
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
-.zamjena-strip-empty {
+.swap-strip-empty {
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-.zamjena-strip-figs {
+.swap-strip-figs {
   display: flex;
   gap: 6px;
   justify-content: center;
@@ -127,7 +127,7 @@
   align-items: center;
 }
 
-.zamjena-fig-btn {
+.swap-fig-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -144,14 +144,14 @@
   min-width: 38px;
 }
 
-.zamjena-fig-num {
+.swap-fig-num {
   font-size: 0.9rem;
   font-weight: 800;
   text-align: center;
   width: 100%;
 }
 
-.zamjena-fig-coord {
+.swap-fig-coord {
   font-size: 0.65rem;
   font-weight: 600;
   opacity: 0.85;
@@ -159,18 +159,18 @@
   width: 100%;
 }
 
-.zamjena-fig-btn:hover:not(:disabled) {
+.swap-fig-btn:hover:not(:disabled) {
   transform: scale(1.1);
   border-color: #fff;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
-.zamjena-fig-btn:disabled {
+.swap-fig-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.zamjena-skip-btn {
+.swap-skip-btn {
   flex-shrink: 0;
   font-size: 1rem;
   padding: 4px 8px;

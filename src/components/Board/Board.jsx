@@ -44,17 +44,17 @@ function CenterDie({ value, onRoll, disabled, rollsLeft, showRollCount, playerCo
 }
 
 const SPECIAL_ICONS = {
-  most:    '🌉',
-  kocka:   '🎲',
-  rewind:  '⏪',
-  bomba:   '💣',
-  stop:    '⏸️',
-  zamjena: '🔄',
+  bridge: '🌉',
+  dice:   '🎲',
+  rewind: '⏪',
+  bomb:   '💣',
+  stop:   '⏸️',
+  swap:   '🔄',
 };
 
 const SPECIAL_KEYS = {
-  most: 'specialMost', kocka: 'specialKocka', rewind: 'specialRewind',
-  bomba: 'specialBomba', stop: 'specialStop', zamjena: 'specialZamjena',
+  bridge: 'specialBridge', dice: 'specialDice', rewind: 'specialRewind',
+  bomb: 'specialBomb', stop: 'specialStop', swap: 'specialSwap',
 };
 
 const COLOR_HEX = {
@@ -283,7 +283,7 @@ export default function Board({
           specialBadge = figs.length > 0;
           if (sp.type === 'stop' && figs.some(f => f.stopArmed)) specialArmed = true;
           if (sp.type === 'rewind' && figs.some(f => f.rewindArmed)) specialArmed = true;
-          if (sp.type === 'zamjena' && sp.placedBy) {
+          if (sp.type === 'swap' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
           }
@@ -301,7 +301,7 @@ export default function Board({
           specialBadge = figs.length > 0;
           if (sp.type === 'stop' && figs.some(f => f.stopArmed)) specialArmed = true;
           if (sp.type === 'rewind' && figs.some(f => f.rewindArmed)) specialArmed = true;
-          if (sp.type === 'zamjena' && sp.placedBy) {
+          if (sp.type === 'swap' && sp.placedBy) {
             swapPlacerColor = COLOR_HEX[sp.placedBy];
             specialIcon = <SwapIcon color={swapPlacerColor} />;
           }

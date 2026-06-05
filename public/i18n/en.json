@@ -66,13 +66,13 @@
 
   "menuFooter": "2 - 8 players",
 
-  "zamjenaNoFigs": "No pieces available to swap.",
-  "zamjenaFig": "Piece",
-  "zamjenaSkip": "Skip",
-  "zamjenaOwnField": "This is your own SWAP field - no effect.",
+  "swapNoFigs": "No pieces available to swap.",
+  "swapFig": "Piece",
+  "swapSkip": "Skip",
+  "swapOwnField": "This is your own SWAP field - no effect.",
 
-  "mostCannotPlace": "BRIDGE not possible - no free parallel square",
-  "mostCannotField": "BRIDGE not possible on this square",
+  "bridgeCannotPlace": "BRIDGE not possible - no free parallel square",
+  "bridgeCannotField": "BRIDGE not possible on this square",
 
   "pickupChoiceTitle": "Pick up which field?",
   "pickupSpecial": "Special field",
@@ -83,26 +83,26 @@
   "duelLoser": "goes home",
   "duelRoll": "Roll for the duel",
 
-  "specialMost": "BRIDGE",
-  "specialKocka": "DICE",
+  "specialBridge": "BRIDGE",
+  "specialDice": "DICE",
   "specialRewind": "REWIND",
-  "specialBomba": "BOMB",
+  "specialBomb": "BOMB",
   "specialStop": "STOP",
-  "specialZamjena": "SWAP",
+  "specialSwap": "SWAP",
 
-  "specialMostQ": "Stay on the square or cross the bridge?",
-  "specialMostStay": "Stay",
-  "specialMostCross": "Cross bridge",
+  "specialBridgeQ": "Stay on the square or cross the bridge?",
+  "specialBridgeStay": "Stay",
+  "specialBridgeCross": "Cross bridge",
   "bridgeDirectionQ": "Choose bridge direction",
   "bridgeDirTop": "Top",
   "bridgeDirLeft": "Left",
   "bridgeDirRight": "Right",
   "bridgeDirBottom": "Bottom",
 
-  "specialZamjenaTitle": "Swap piece",
-  "specialZamjenaRoll": "Roll dice to choose color",
+  "specialSwapTitle": "Swap piece",
+  "specialSwapRoll": "Roll dice to choose color",
 
-  "specialBombaMsg": "Boom! The piece went home.",
+  "specialBombMsg": "Boom! The piece went home.",
   "bombAlertTitle": "Bomb armed!",
   "bombAlertMsg": "Move the piece that has activated the BOMB or it will return to HOME.",
   "stopAlertTitle": "STOP armed!",
@@ -111,7 +111,7 @@
   "rewindAlertMsg": "Move the piece that has activated REWIND this turn, or it will be forced to move counter-clockwise on its next move.",
   "specialStopMsg": "Stop! Piece can only move by 1.",
   "specialRewindMsg": "Rewind! Next move goes backward.",
-  "specialKockaMsg": "Dice! Roll two dice.",
+  "specialDiceMsg": "Dice! Roll two dice.",
 
   "rulesTitle": "Game Rules",
 

@@ -1,12 +1,12 @@
 import './PlayerPanel.css';
 
 const SPECIAL_ICONS = {
-  most: '🌉', kocka: '🎲', rewind: '⏪', bomba: '💣', stop: '⏸️', zamjena: '🔄',
+  bridge: '🌉', dice: '🎲', rewind: '⏪', bomb: '💣', stop: '⏸️', swap: '🔄',
 };
 
 const SPECIAL_KEYS = {
-  most: 'specialMost', kocka: 'specialKocka', rewind: 'specialRewind',
-  bomba: 'specialBomba', stop: 'specialStop', zamjena: 'specialZamjena',
+  bridge: 'specialBridge', dice: 'specialDice', rewind: 'specialRewind',
+  bomb: 'specialBomb', stop: 'specialStop', swap: 'specialSwap',
 };
 
 const COLOR_HEX = {
@@ -86,7 +86,7 @@ export default function PlayerPanel({
               key={type}
               className={`special-chip ${selectedSpecial === type ? 'special-chip--selected' : ''} ${isSixAction ? 'special-chip--active' : ''} ${isDisabled ? 'special-chip--disabled' : ''}`}
               onClick={() => { if (canPlace && isMyTurn) onSelectSpecialForPlace?.(type); }}
-              title={isDisabled ? t('mostCannotField') : t(SPECIAL_KEYS[type])}
+              title={isDisabled ? t('bridgeCannotField') : t(SPECIAL_KEYS[type])}
             >
               {SPECIAL_ICONS[type]}{count > 1 ? <span className="special-chip-count">×{count}</span> : ''}
             </button>

@@ -141,8 +141,16 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   autoAdvanceRef.current = () => {
     if (!isMyTurn) return;
     if (phase === 'rolling') {
-      // Stage B (bonus re-roll) or normal rolling — missed roll = skip.
-      skipPlayerTurn?.(currentPlayer.color);
+      // If this would be their 2nd consecutive missed roll (skipCount already 1),
+      // kick directly instead of going skipCount=1→2 and waiting for the kick
+      // effect. Belt-and-suspenders for the lone-survivor case where the kick
+      // effect chain might lag.
+      const me = state.players[state.currentPlayerIndex];
+      if (me && (me.skipCount ?? 0) >= 1 && removePlayer) {
+        removePlayer(me.color);
+      } else {
+        skipPlayerTurn?.(currentPlayer.color);
+      }
     }
     else if (phase === 'moving') {
       if (validMoves.length > 0) {

@@ -35,10 +35,22 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   }, []);
 
   const localHook = useGame(setup?.players || []);
-  const { state, currentPlayer, validMoves, placementMoves, rollDice, selectMove,
+  const { state, currentPlayer: rawCurrentPlayer, validMoves, placementMoves, rollDice, selectMove,
     skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
     dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
   } = gameHook ?? localHook;
+
+  // When everyone has been removed (e.g. two consecutive timeouts kicked
+  // the last player), `state.players` is empty and `currentPlayer` is
+  // undefined. Provide a safe placeholder so the topbar/board/PlayerPanel
+  // can still render — the final-results modal renders on top.
+  const currentPlayer = rawCurrentPlayer ?? {
+    color: state.allColors?.[0] ?? 'red',
+    name: '',
+    figures: [],
+    specialsHeld: [],
+    skipCount: 0,
+  };
 
   const { containerRef: boardAreaRef, transform: boardTransform } = usePinchZoom();
 
@@ -418,40 +430,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
 
   if (!gameHook && !setup) return null;
 
-  // Everyone was removed (e.g. two consecutive timeouts kicked the last player).
-  // Topbar/board/PlayerPanel can't render without a current player — show only
-  // the final-results modal driven by state.standings / state.allColors / state.initialNames.
-  if (!currentPlayer) {
-    const standings = state.standings || [];
-    const allColors = state.allColors || [];
-    const names = state.initialNames || {};
-    const dnfColors = allColors.filter(c => !standings.includes(c));
-    return (
-      <div className="gameboard-page page">
-        <Modal title={t('gameFinalResultsTitle')}>
-          <p style={{ textAlign: 'center', fontSize: '2rem', margin: 0 }}>🏆</p>
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '4px', margin: '8px 0' }}>
-            {standings.map((color, i) => {
-              const medal = ['🥇','🥈','🥉'][i] ?? '🎖️';
-              return (
-                <div key={color} style={{ textAlign: 'center' }}>
-                  <strong style={{ color: COLOR_HEX[color] }}>{medal} {i + 1}. {names[color] ?? color}</strong>
-                </div>
-              );
-            })}
-            {dnfColors.map(color => (
-              <div key={color} style={{ textAlign: 'center', opacity: 0.5 }}>
-                <strong style={{ color: COLOR_HEX[color] }}>— {t('gameDNF')} — {names[color] ?? color}</strong>
-              </div>
-            ))}
-          </div>
-          <button className="btn btn-primary" onClick={() => navigate(playAgainPath)}>{t('gamePlayAgain')}</button>
-          <button className="btn btn-secondary" onClick={() => navigate('/')}>{t('gameMainMenu')}</button>
-        </Modal>
-      </div>
-    );
-  }
-
   return (
     <div className="gameboard-page page">
       {/* Top bar */}
@@ -531,22 +509,24 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
             t={t}
           />
         )}
-        <PlayerPanel
-          players={state.players}
-          currentPlayerIndex={state.currentPlayerIndex}
-          phase={phase}
-          isMyTurn={isMyTurn}
-          placeableSpecials={placeableSpecials}
-          onSelectSpecialForPlace={type => {
-            if (!isMyTurn || !isSixAction) return;
-            if (!placeableSpecials.has(type)) return;
-            setSelectedSpecialType(type === selectedSpecialType ? null : type);
-          }}
-          selectedSpecial={selectedSpecialType}
-          hasPickup={hasPickup}
-          onPickup={handlePickupBtn}
-          t={t}
-        />
+        {state.players.length > 0 && (
+          <PlayerPanel
+            players={state.players}
+            currentPlayerIndex={state.currentPlayerIndex}
+            phase={phase}
+            isMyTurn={isMyTurn}
+            placeableSpecials={placeableSpecials}
+            onSelectSpecialForPlace={type => {
+              if (!isMyTurn || !isSixAction) return;
+              if (!placeableSpecials.has(type)) return;
+              setSelectedSpecialType(type === selectedSpecialType ? null : type);
+            }}
+            selectedSpecial={selectedSpecialType}
+            hasPickup={hasPickup}
+            onPickup={handlePickupBtn}
+            t={t}
+          />
+        )}
         <div className="game-controls">
           {isMoving && validMoves.length === 0 && isMyTurn && (
             <button className="btn btn-secondary" onClick={skipPlaceSpecial}>

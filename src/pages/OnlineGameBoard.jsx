@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useOnlineGame } from '../hooks/useOnlineGame';
+import { reducer } from '../hooks/useGame';
 import GameBoard from './GameBoard';
 
 const HEARTBEAT_INTERVAL = 30_000; // write presence every 30s
@@ -70,32 +71,51 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     uid: p.uid,
   }));
 
-  const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState);
+  const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState, myUid, room.hostUid);
 
-  // ── Kick watcher: when any player's skipCount reaches 2 in gameState
-  //    (set by present-but-idle self-skip via autoAdvance, or by the active-stale
-  //    detector below), remove them from room.players. This cascades through
-  //    the REMOVE_PLAYER reducer which eliminates their pieces, specials,
-  //    bridges, and transfers host if needed. Multiple clients may write
-  //    simultaneously — Firestore's last-write-wins makes it idempotent. ──
-  useEffect(() => {
-    const target = gameHook.state.players.find(p => (p.skipCount ?? 0) >= 2);
-    if (!target?.uid) return;
-    const remaining = room.players.filter(p => p.uid !== target.uid);
+  // Only the host (primary) or seat 0 (fallback when the host disconnects) may
+  // drive recovery writes — stale-skip and kick. This keeps the authorized
+  // writer deterministic so the Firestore rules can pin it; both roles migrate
+  // as players leave. Mirrors isRecoverer() in firestore.rules.
+  const canManage = myUid === room.hostUid || myUid === room.players[0]?.uid;
+
+  // Remove a player by writing the shrunk room roster AND the recomputed
+  // gameState in a SINGLE updateDoc, so the two never diverge (the rules'
+  // isRemovalCascade requires the gameState player count to match the room
+  // roster in the same write). The REMOVE_PLAYER reducer eliminates their
+  // pieces/specials/bridges and advances the turn. Last-write-wins + the
+  // reducer's no-op-on-missing-color make concurrent recoverer writes safe.
+  const removePlayer = useCallback((targetUid, color) => {
+    if (!canManage) return;
+    const remaining = room.players.filter(p => p.uid !== targetUid);
     const updates = {
       players: remaining,
       playerUids: remaining.map(p => p.uid),
       updatedAt: serverTimestamp(),
     };
-    if (room.hostUid === target.uid && remaining.length > 0) {
+    if (room.hostUid === targetUid && remaining.length > 0) {
       updates.hostUid = remaining[0].uid;
     }
+    if (color && room.gameState) {
+      updates.gameState = reducer(gameHook.state, { type: 'REMOVE_PLAYER', color });
+    }
     updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
-  }, [gameHook.state.players, room.players, room.hostUid, roomId]);
+  }, [canManage, room.players, room.hostUid, room.gameState, gameHook.state, roomId]);
+
+  // ── Kick watcher: when any player's skipCount reaches 2 in gameState
+  //    (set by present-but-idle self-skip via autoAdvance, or by the active-stale
+  //    detector below), remove them. ──
+  useEffect(() => {
+    if (!canManage) return;
+    const target = gameHook.state.players.find(p => (p.skipCount ?? 0) >= 2);
+    if (!target?.uid) return;
+    removePlayer(target.uid, target.color);
+  }, [gameHook.state.players, canManage, removePlayer]);
 
   // ── Stale-presence detection: if another player stopped sending heartbeats,
-  //    remove them from room.players so the existing REMOVE_PLAYER path fires. ──
+  //    remove them. ──
   useEffect(() => {
+    if (!canManage) return;
     if (gameHook.state.phase === 'game-over') return;
     if (!room.presence) return;
 
@@ -108,23 +128,13 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
       return lastSeen && now - lastSeen > STALE_THRESHOLD;
     });
 
-    if (stalePlayer) {
-      const remaining = room.players.filter(p => p.uid !== stalePlayer.uid);
-      const updates = {
-        players: remaining,
-        playerUids: remaining.map(p => p.uid),
-        updatedAt: serverTimestamp(),
-      };
-      if (room.hostUid === stalePlayer.uid && remaining.length > 0) {
-        updates.hostUid = remaining[0].uid;
-      }
-      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
-    }
-  }, [room.presence, gameHook.state.players, gameHook.state.phase]);
+    if (stalePlayer) removePlayer(stalePlayer.uid, stalePlayer.color);
+  }, [room.presence, gameHook.state.players, gameHook.state.phase, canManage, myUid, removePlayer]);
 
   // ── Active-player stale detection: skip them after ACTIVE_STALE_MS;
-  //    kick them on a 2nd consecutive skip. Reuses REMOVE_PLAYER path. ──
+  //    kick them on a 2nd consecutive skip. ──
   useEffect(() => {
+    if (!canManage) return;
     const phase = gameHook.state.phase;
     if (phase === 'game-over' || phase === 'initial-roll') return;
     if (!room.presence) return;
@@ -135,21 +145,11 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     if (Date.now() - lastSeen <= ACTIVE_STALE_MS) return;
 
     if ((active.skipCount ?? 0) >= 1) {
-      // Second consecutive skip — kick.
-      const remaining = room.players.filter(p => p.uid !== active.uid);
-      const updates = {
-        players: remaining,
-        playerUids: remaining.map(p => p.uid),
-        updatedAt: serverTimestamp(),
-      };
-      if (room.hostUid === active.uid && remaining.length > 0) {
-        updates.hostUid = remaining[0].uid;
-      }
-      updateDoc(doc(db, 'rooms', roomId), updates).catch(() => {});
+      removePlayer(active.uid, active.color);   // second consecutive skip — kick
     } else {
-      gameHook.skipPlayerTurn(active.color);
+      gameHook.skipPlayerTurn(active.color);    // persisted by the recoverer via useOnlineGame
     }
-  }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players]);
+  }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players, canManage, myUid, removePlayer]);
 
   // Use game-state players (not room.players) so indices stay correct after removals
   const myColor = gameHook.state.players.find(p => p.uid === myUid)?.color;

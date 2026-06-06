@@ -17,6 +17,17 @@ service cloud.firestore {
       function isHost()      { return existing().hostUid == uid(); }
       function isMember()    { return uid() in existing().playerUids; }
 
+      // A "recoverer" may drive cross-player recovery writes (stale-skip, kick).
+      // The host is the primary; seat 0 (players[0]) is the fallback so the game
+      // can still advance when the host itself disconnects. Both migrate as
+      // players leave, so authority is never permanently lost (except the rare
+      // case where host == seat 0 and that single player goes stale on its own
+      // turn — the room then needs a fresh game).
+      function isRecoverer() {
+        return isHost()
+          || (existing().players.size() > 0 && uid() == existing().players[0].uid);
+      }
+
       function createShapeOk() {
         return incoming().keys().hasOnly(
           ['code', 'hostUid', 'status', 'players', 'playerUids',
@@ -61,26 +72,24 @@ service cloud.firestore {
           && incoming().players.size() == existing().players.size() + 1;
       }
 
-      // Leave or stale-removal: list shrinks; host may transfer if host left.
+      // Leave or stale-removal WHILE gameState is unchanged (waiting room, or a
+      // removal that does not touch the board). Active-game removals that also
+      // shrink gameState go through isRemovalCascade() instead.
       function isLeaveOrRemoval() {
         return incoming().players.size() < existing().players.size()
           && incoming().playerUids.size() < existing().playerUids.size()
           && incoming().gameState == existing().gameState
           && incoming().status == existing().status
           && (
-            // hostUid unchanged and host is still in the room
             (incoming().hostUid == existing().hostUid
               && incoming().hostUid in incoming().playerUids)
-            // host left → crown goes to the new first player
             || (incoming().players.size() > 0
               && incoming().hostUid == incoming().players[0].uid)
-            // room emptied
             || incoming().players.size() == 0
           );
       }
 
-      // Self-edit of own name/color. Members can shuffle name/color on the
-      // players list; uids are pinned via playerUids so no impersonation.
+      // Self-edit of own name/color. uids pinned via playerUids so no impersonation.
       function isSelfEdit() {
         return incoming().status == existing().status
           && incoming().hostUid == existing().hostUid
@@ -90,7 +99,8 @@ service cloud.firestore {
           && isMember();
       }
 
-      // Host transitions waiting → active.
+      // Host transitions waiting → active (gameState still null; it is seeded
+      // separately by isSeedGameState once the board mounts).
       function isStartGame() {
         return isHost()
           && existing().status == 'waiting'
@@ -110,28 +120,180 @@ service cloud.firestore {
           && isMember();
       }
 
-      // Game-state write during an active game by a member.
-      function isGameStateWrite() {
-        return existing().status == 'active'
-          && incoming().status == 'active'
+      // ---- gameState helpers ----
+
+      function gsExisting() { return existing().gameState; }
+      function gsIncoming() { return incoming().gameState; }
+
+      // Seed the first gameState (null → initial-roll) once the game is active.
+      // Host only, so racing clients don't write divergent randomized seeds.
+      function isSeedGameState() {
+        return isHost()
+          && existing().status == 'active' && incoming().status == 'active'
           && incoming().hostUid == existing().hostUid
           && incoming().players == existing().players
           && incoming().playerUids == existing().playerUids
-          && isMember();
+          && gsExisting() == null
+          && gsIncoming() != null
+          && gsIncoming().phase == 'initial-roll'
+          && gsIncoming().players.size() == incoming().players.size();
+      }
+
+      // Recoverer kick during an active game: shrink room roster AND gameState
+      // in a SINGLE write so the two stay consistent (isLeaveOrRemoval forbids
+      // gameState changes, so it cannot cover this case).
+      function isRemovalCascade() {
+        return isRecoverer()
+          && incoming().players.size() < existing().players.size()
+          && incoming().playerUids.size() < existing().playerUids.size()
+          && incoming().status == existing().status
+          && gsExisting() != null && gsIncoming() != null
+          && gsIncoming().players.size() <= gsExisting().players.size()
+          && gsIncoming().players.size() == incoming().players.size()
+          && ( incoming().hostUid in incoming().playerUids
+            || incoming().players.size() == 0
+            || incoming().hostUid == incoming().players[0].uid );
+      }
+
+      // ---- parameterized active-game write rules ----
+      // d/n = existing/incoming room doc; g/h = existing/incoming gameState.
+      // Threading these as parameters (instead of re-deriving existing().game-
+      // State on every helper call) keeps a single write well under Firestore's
+      // 1000-expression evaluation limit.
+
+      function curIdxOkP(g) {
+        return g.players is list && g.currentPlayerIndex is int
+          && g.currentPlayerIndex >= 0
+          && g.currentPlayerIndex < g.players.size();
+      }
+      function currentIsMeP(g) {
+        return curIdxOkP(g) && g.players[g.currentPlayerIndex].uid == uid();
+      }
+      function recovererP(d) {
+        return d.hostUid == uid()
+          || (d.players.size() > 0 && d.players[0].uid == uid());
+      }
+
+      // Structural invariants every active-game gameState write must satisfy.
+      function structOkP(d, n, g, h) {
+        return h.phase == 'game-over'
+          ? h.players.size() <= g.players.size()
+          : ( curIdxOkP(g)
+            && h.currentPlayerIndex is int
+            && h.currentPlayerIndex >= 0
+            && h.currentPlayerIndex < h.players.size()
+            && h.players.size() <= g.players.size()
+            && h.players.size() == n.players.size()
+            && h.standings.size() >= g.standings.size()
+            && n.players == d.players
+            && n.playerUids == d.playerUids );
+      }
+
+      // Normal move by the current player (select/place/end-turn/attacker duel
+      // resolution/special resolution). A move may NOT mint a new diceValue — it
+      // can only keep the current one or clear it; new dice come only from the
+      // verifiable roll (rollDeriveP). It never carries a pending seed.
+      function moveP(g, h) {
+        return currentIsMeP(g)
+          && h.phase != 'initial-roll'
+          && (h.diceValue == g.diceValue || h.diceValue == null)
+          && h.get('rollSeed', null) == null;
+      }
+
+      // Verifiable roll, phase 1: commit a server-stamped seed. The seed must
+      // equal request.time (client cannot choose it); no roll may be in flight;
+      // diceValue/turn/phase/standings untouched.
+      function rollInitP(g, h) {
+        return currentIsMeP(g)
+          && g.get('rollSeed', null) == null
+          && h.get('rollSeed', null) == request.time
+          && h.diceValue == g.diceValue
+          && h.currentPlayerIndex == g.currentPlayerIndex
+          && h.phase == g.phase
+          && h.standings == g.standings;
+      }
+
+      // Verifiable roll, phase 2: derive diceValue from the committed seed and
+      // clear it. The rule recomputes the value, so it cannot be forged, and the
+      // seed lock prevents re-rolling for a better one.
+      function rollDeriveP(g, h) {
+        return currentIsMeP(g)
+          && g.get('rollSeed', null) != null
+          && h.get('rollSeed', null) == null
+          && h.diceValue == (g.get('rollSeed', null).toMillis() % 6) + 1;
+      }
+
+      // The duel defender (not the current player) writing only their roll.
+      function duelDefP(g, h) {
+        return g.phase == 'duel' && g.duelState != null
+          && g.duelState.defUid == uid()
+          && h.players == g.players
+          && h.currentPlayerIndex == g.currentPlayerIndex
+          && h.phase == 'duel'
+          && h.standings == g.standings;
+      }
+
+      // Stale-skip of an absent active player by a recoverer (host/seat 0).
+      function staleSkipP(d, g, h) {
+        return recovererP(d)
+          && g.phase != 'initial-roll' && g.phase != 'game-over'
+          && h.players.size() == g.players.size()
+          && h.standings == g.standings;
+      }
+
+      // Pre-game initial-roll. Actor is identified by color (unresolvable in
+      // rules) so any member may roll; only the host flips phase to 'rolling'.
+      function initialRollP(d, g, h) {
+        return g.phase == 'initial-roll'
+          && (h.phase == 'initial-roll'
+              || (h.phase == 'rolling' && d.hostUid == uid()))
+          && h.players.size() == g.players.size();
+      }
+
+      // Recoverer drives the board into game-over (e.g. everyone removed).
+      function gameOverP(d, g, h) {
+        return recovererP(d) && h.phase == 'game-over'
+          && h.players.size() <= g.players.size();
+      }
+
+      function isGameStateWriteP(d, n, g, h) {
+        return d.status == 'active' && n.status == 'active'
+          && n.hostUid == d.hostUid
+          && g != null && h != null
+          && (uid() in d.playerUids)
+          && structOkP(d, n, g, h)
+          && ( moveP(g, h)
+            || rollInitP(g, h)
+            || rollDeriveP(g, h)
+            || duelDefP(g, h)
+            || staleSkipP(d, g, h)
+            || initialRollP(d, g, h)
+            || gameOverP(d, g, h) );
       }
 
       allow read:   if isAllowedUser();
       allow create: if isAllowedUser() && createShapeOk();
+      // Branch on status so active-game writes never evaluate the lobby
+      // transitions (and vice-versa), and order each branch with its hot path
+      // first. This keeps any single write well under Firestore's 1000-
+      // expression evaluation limit — a flat OR over every transition can
+      // exceed it once gameState carries real figures/specials.
       allow update: if isAllowedUser()
         && sizeOk()
         && immutableFieldsUnchanged()
         && (
-          isJoin()
-          || isLeaveOrRemoval()
-          || isSelfEdit()
-          || isStartGame()
-          || isPresenceWrite()
-          || isGameStateWrite()
+          existing().status == 'active'
+            ? ( isGameStateWriteP(existing(), incoming(), gsExisting(), gsIncoming())
+                || isSeedGameState()
+                || isRemovalCascade()
+                || isPresenceWrite()
+                || isSelfEdit()
+                || isLeaveOrRemoval() )
+            : ( isJoin()
+                || isStartGame()
+                || isSelfEdit()
+                || isPresenceWrite()
+                || isLeaveOrRemoval() )
         );
       allow delete: if false;
     }

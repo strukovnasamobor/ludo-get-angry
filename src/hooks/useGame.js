@@ -74,6 +74,9 @@ function initState(setupPlayers) {
     bridgesOnBoard: {},
     duelState: null,
     specialTrigger: null,
+    // Server-committed seed for a verifiable dice roll (online play). null when
+    // no roll is in flight; see useOnlineGame's two-phase roll + firestore.rules.
+    rollSeed: null,
     // Finish standings — colors in finish order. First entry = 1st place.
     // Replaces the old single `winner` field. Game-over fires when every
     // remaining (non-DNF) player has been appended.
@@ -366,6 +369,7 @@ function advanceTurn(state) {
     rollsLeft: stuck ? 3 : 1,
     bonusRoll: false,
     phase: 'rolling',
+    rollSeed: null, // clear any verifiable-roll seed on turn handoff
   };
 }
 
@@ -565,6 +569,10 @@ function applyLandingPrecedence(state, newPlayers, ring, idx, figId, playerColor
     const duelSt = {
       atkColor: playerColor,
       defColor: occupied.player.color,
+      // uids let Firestore rules authorize the defender's roll write (the
+      // defender is not the current player). null in offline/hot-seat play.
+      atkUid: newPlayers.find(p => p.color === playerColor)?.uid ?? null,
+      defUid: occupied.player.uid ?? null,
       ring, idx, figId,
       defFigId: occupied.figure.id,
       atkRoll: null, defRoll: null,
@@ -721,7 +729,11 @@ function reducer(state, action) {
           i === state.currentPlayerIndex ? { ...p, skipCount: 0 } : p
         ) };
       }
-      const val = rollD6();
+      // Consume the verifiable-roll seed (online supplies action.forcedValue
+      // derived from it; offline rolls locally). Clearing it frees the lock so
+      // the next roll can commit a fresh seed.
+      state = { ...state, rollSeed: null };
+      const val = action.forcedValue ?? rollD6();
       const player = state.players[state.currentPlayerIndex];
       const stuck = isAllStuck(player);
 

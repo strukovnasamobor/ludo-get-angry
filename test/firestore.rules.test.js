@@ -122,26 +122,161 @@ describe('turn ownership', () => {
   });
 });
 
-describe('duel defender', () => {
-  const duel = () =>
+// Seed used across verifiable-roll tests. 1000003 % 6 === 1 → single-die value 2;
+// floor(1000003 / 6) % 6 === 5 → KOCKA d2 value 6.
+const SEED_MS = 1000003;
+const DIE = (SEED_MS % 6) + 1;                       // 2
+const D2 = (Math.floor(SEED_MS / 6) % 6) + 1;        // 6
+const seedTs = () => Timestamp.fromMillis(SEED_MS);
+
+describe('duel (verifiable, serialized)', () => {
+  // attacker rolled (3); defender about to roll; a seed is committed.
+  const duelAwaitingDef = () =>
     gameState({
       phase: 'duel',
-      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', defRoll: null, atkRoll: null },
+      rollSeed: seedTs(),
+      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', atkRoll: 3, defRoll: null },
     });
 
-  it('defender may write only their roll', async () => {
-    await seed(room({ gameState: duel() }));
-    const next = duel();
-    next.duelState = { ...next.duelState, defRoll: 4 };
+  it('defender derives their roll from the committed seed', async () => {
+    await seed(room({ gameState: duelAwaitingDef() }));
+    const next = duelAwaitingDef();
+    next.rollSeed = null;
+    next.duelState = { ...next.duelState, defRoll: DIE };
     await assertSucceeds(updateDoc(ref(db('O')), { gameState: next }));
   });
 
+  it('defender cannot forge a roll value', async () => {
+    await seed(room({ gameState: duelAwaitingDef() }));
+    const next = duelAwaitingDef();
+    next.rollSeed = null;
+    next.duelState = { ...next.duelState, defRoll: 6 }; // wrong (should be DIE)
+    await assertFails(updateDoc(ref(db('O')), { gameState: next }));
+  });
+
   it('defender may NOT tamper with the roster while rolling', async () => {
-    await seed(room({ gameState: duel() }));
-    const tampered = duel();
-    tampered.duelState = { ...tampered.duelState, defRoll: 4 };
-    tampered.players = players().map((p) => (p.uid === 'O' ? { ...p, color: 'red' } : p));
+    await seed(room({ gameState: duelAwaitingDef() }));
+    const tampered = duelAwaitingDef();
+    tampered.rollSeed = null;
+    tampered.duelState = { ...tampered.duelState, defRoll: DIE };
+    tampered.players = players().map((p) => (p.uid === 'O' ? { ...p, color: 'magenta' } : p));
     await assertFails(updateDoc(ref(db('O')), { gameState: tampered }));
+  });
+
+  it('attacker derives their roll first (atkRoll from seed)', async () => {
+    const pre = gameState({
+      phase: 'duel',
+      rollSeed: seedTs(),
+      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', atkRoll: null, defRoll: null },
+    });
+    await seed(room({ gameState: pre }));
+    const next = { ...pre, rollSeed: null, duelState: { ...pre.duelState, atkRoll: DIE } };
+    await assertSucceeds(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('defender may not roll before the attacker (serialization)', async () => {
+    const pre = gameState({
+      phase: 'duel',
+      rollSeed: seedTs(),
+      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', atkRoll: null, defRoll: null },
+    });
+    await seed(room({ gameState: pre }));
+    const next = { ...pre, rollSeed: null, duelState: { ...pre.duelState, defRoll: DIE } };
+    await assertFails(updateDoc(ref(db('O')), { gameState: next }));
+  });
+
+  it('defender may commit a seed only after the attacker has rolled', async () => {
+    const noAtk = gameState({
+      phase: 'duel',
+      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', atkRoll: null, defRoll: null },
+    });
+    await seed(room({ gameState: noAtk }));
+    await assertFails(updateDoc(ref(db('O')), { 'gameState.rollSeed': serverTimestamp() }));
+
+    const withAtk = gameState({
+      phase: 'duel',
+      duelState: { atkColor: 'blue', defColor: 'green', atkUid: 'C', defUid: 'O', atkRoll: 3, defRoll: null },
+    });
+    await seed(room({ gameState: withAtk }));
+    await assertSucceeds(updateDoc(ref(db('O')), { 'gameState.rollSeed': serverTimestamp() }));
+  });
+});
+
+describe('KOCKA (verifiable two dice)', () => {
+  const kockaPending = () =>
+    gameState({
+      phase: 'special-trigger',
+      rollSeed: seedTs(),
+      specialTrigger: { type: 'dice', d1: null, d2: null, ring: 'outer', idx: 5, figId: 0, playerColor: 'blue' },
+    });
+
+  it('current player derives d1/d2 from the seed', async () => {
+    await seed(room({ gameState: kockaPending() }));
+    const next = kockaPending();
+    next.rollSeed = null;
+    next.specialTrigger = { ...next.specialTrigger, d1: DIE, d2: D2 };
+    await assertSucceeds(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('forged d1/d2 is rejected', async () => {
+    await seed(room({ gameState: kockaPending() }));
+    const next = kockaPending();
+    next.rollSeed = null;
+    next.specialTrigger = { ...next.specialTrigger, d1: 6, d2: 6 };
+    await assertFails(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('non-current player cannot derive KOCKA', async () => {
+    await seed(room({ gameState: kockaPending() }));
+    const next = kockaPending();
+    next.rollSeed = null;
+    next.specialTrigger = { ...next.specialTrigger, d1: DIE, d2: D2 };
+    await assertFails(updateDoc(ref(db('O')), { gameState: next }));
+  });
+});
+
+describe('initial-roll (verifiable value)', () => {
+  const initPending = () =>
+    gameState({
+      phase: 'initial-roll',
+      currentPlayerIndex: 0,
+      rollSeed: seedTs(),
+      initialRollOrder: ['red', 'blue', 'green'],
+      initialRollIdx: 1, // roller = 'blue' (player C)
+      initialRolls: {},
+    });
+
+  it('roller value must equal the seed derivation', async () => {
+    await seed(room({ gameState: initPending() }));
+    const next = initPending();
+    next.rollSeed = null;
+    next.initialRolls = { blue: DIE };
+    next.initialRollIdx = 2;
+    await assertSucceeds(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('forged initial-roll value is rejected', async () => {
+    await seed(room({ gameState: initPending() }));
+    const next = initPending();
+    next.rollSeed = null;
+    next.initialRolls = { blue: 6 };
+    next.initialRollIdx = 2;
+    await assertFails(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('cannot add an initial-roll value without a committed seed', async () => {
+    const noSeed = gameState({
+      phase: 'initial-roll', currentPlayerIndex: 0,
+      initialRollOrder: ['red', 'blue', 'green'], initialRollIdx: 1, initialRolls: {},
+    });
+    await seed(room({ gameState: noSeed }));
+    const next = { ...noSeed, initialRolls: { blue: 6 }, initialRollIdx: 2 };
+    await assertFails(updateDoc(ref(db('C')), { gameState: next }));
+  });
+
+  it('any member may commit a seed during initial-roll', async () => {
+    await seed(room({ gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0 }) }));
+    await assertSucceeds(updateDoc(ref(db('O')), { 'gameState.rollSeed': serverTimestamp() }));
   });
 });
 
@@ -161,14 +296,64 @@ describe('stale-skip (recoverer only)', () => {
     await seed(room());
     await assertFails(updateDoc(ref(db('O')), { gameState: skipped() }));
   });
+
+  it('a present player MAY recover once the host heartbeat is stale', async () => {
+    // host H last seen in 1970 → hostStale → any member may recover so the
+    // room doesn't freeze on an absent host (who is usually also seat 0).
+    await seed(room({ presence: { H: Timestamp.fromMillis(1000) } }));
+    await assertSucceeds(updateDoc(ref(db('O')), { gameState: skipped() }));
+  });
+
+  it('an ordinary player may NOT recover while the host heartbeat is fresh', async () => {
+    await seed(room({ presence: { H: Timestamp.fromMillis(Date.now()) } }));
+    await assertFails(updateDoc(ref(db('O')), { gameState: skipped() }));
+  });
+
+  // HOST_AUTO_PLAY shape: the absent player's turn is rolled + a piece moved +
+  // skipCount++ + turn advanced, all in one write, roster size preserved.
+  const autoPlayed = () =>
+    gameState({
+      currentPlayerIndex: 2,
+      diceValue: null, // consumed by the move, then turn advanced
+      players: players().map((p, i) =>
+        i === 1
+          ? { ...p, skipCount: 1, figures: [{ id: 0, pos: { ring: 'outer', idx: 7 } }] } // a piece moved
+          : p),
+    });
+
+  it('host may auto-play (roll + random move) an absent turn', async () => {
+    await seed(room());
+    await assertSucceeds(updateDoc(ref(db('H')), { gameState: autoPlayed() }));
+  });
+
+  it('an ordinary player may NOT auto-play someone else', async () => {
+    await seed(room());
+    await assertFails(updateDoc(ref(db('O')), { gameState: autoPlayed() }));
+  });
+
+  it('a recovery move that finishes a piece (standings grows) is allowed', async () => {
+    await seed(room());
+    const next = autoPlayed();
+    next.standings = ['blue'];
+    await assertSucceeds(updateDoc(ref(db('H')), { gameState: next }));
+  });
 });
 
 describe('initial-roll phase', () => {
-  it('any member may roll while phase stays initial-roll', async () => {
-    await seed(room({ gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0 }) }));
+  it('host may reset for a tie re-roll (CONTINUE_AFTER_TIE) without growing rolls', async () => {
+    await seed(room({ gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0, initialRolls: { red: 4, blue: 4 } }) }));
     await assertSucceeds(
+      updateDoc(ref(db('H')), {
+        gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0, initialRolls: {}, initialRollIdx: 0 }),
+      })
+    );
+  });
+
+  it('a non-host may not do initial-roll bookkeeping (rolls go through the seed flow)', async () => {
+    await seed(room({ gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0, initialRolls: { red: 4, blue: 4 } }) }));
+    await assertFails(
       updateDoc(ref(db('O')), {
-        gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0, initialRollIdx: 1 }),
+        gameState: gameState({ phase: 'initial-roll', currentPlayerIndex: 0, initialRolls: {}, initialRollIdx: 0 }),
       })
     );
   });

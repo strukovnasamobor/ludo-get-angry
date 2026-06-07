@@ -38,6 +38,7 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const { state, currentPlayer: rawCurrentPlayer, validMoves, placementMoves, rollDice, selectMove,
     skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
     dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
+    autoRoll, autoMove,
   } = gameHook ?? localHook;
 
   // When everyone has been removed (e.g. two consecutive timeouts kicked
@@ -113,18 +114,27 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     prevStandingsLenRef.current = curr;
   }, [state.standings]);
 
-  // Skip warning: when the active player has skipCount > 0 (they missed their
-  // last turn) and it's their turn again, pop a one-time "Final warning" modal.
-  // Works for both offline (hot-seat: isMyTurn defaults to true → fires for
-  // every current player) and online (only fires on the active player's screen).
+  // Skip warning: when the active player returns to their turn carrying a
+  // skipCount > 0 (they missed/auto-played last time), pop a one-time "Final
+  // warning" modal. Gate on the 'rolling' phase (turn START) so it does NOT fire
+  // mid-turn when an auto-roll bumps skipCount — that would pop the modal during
+  // an auto-played turn and, since the player is idle, leave it stuck on screen.
   useEffect(() => {
-    if (!isMyTurn || !state.players?.length) { prevSkipTurnKeyRef.current = null; return; }
+    if (!isMyTurn || !state.players?.length || state.phase !== 'rolling') { prevSkipTurnKeyRef.current = null; return; }
     const me = state.players[state.currentPlayerIndex];
     if (!me || (me.skipCount ?? 0) === 0) { prevSkipTurnKeyRef.current = null; return; }
     const key = `${state.currentPlayerIndex}-${me.skipCount}`;
     if (key !== prevSkipTurnKeyRef.current) setShowSkipWarning(true);
     prevSkipTurnKeyRef.current = key;
-  }, [state.currentPlayerIndex, state.players, isMyTurn]);
+  }, [state.currentPlayerIndex, state.players, state.phase, isMyTurn]);
+
+  // Auto-dismiss the skip warning so it can never get stuck on an idle player's
+  // screen (and block the view of the auto-played turn).
+  useEffect(() => {
+    if (!showSkipWarning) return;
+    const id = setTimeout(() => setShowSkipWarning(false), 5000);
+    return () => clearTimeout(id);
+  }, [showSkipWarning]);
 
   // Derived
   const phase = state.phase;
@@ -160,8 +170,12 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
       const me = state.players[state.currentPlayerIndex];
       if (me && (me.skipCount ?? 0) >= 1 && removePlayer) {
         removePlayer(me.color);
-      } else {
-        skipPlayerTurn?.(currentPlayer.color);
+      } else if (!state.rollSeed) {
+        // Auto-play the turn instead of bare-skipping: roll now (counts as a
+        // skip). The roll sets state.autoMovePending, and the follow-up effect
+        // below makes one random move immediately. Skip if a roll is already in
+        // flight (the player just clicked) — that derive will resolve normally.
+        autoRoll?.();
       }
     }
     else if (phase === 'moving') {
@@ -230,6 +244,18 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     const timer = setTimeout(endTurn, 1500);
     return () => clearTimeout(timer);
   }, [isNoMoves, endTurn]);
+
+  // After an auto-rolled (timed-out) turn, immediately make one random move so
+  // the turn is played rather than skipped. `state.autoMovePending` is set by
+  // the auto-roll and cleared by the move / a manual roll, so this never fires
+  // for a roll the player made. (no-moves is handled by the effect above.)
+  useEffect(() => {
+    if (!state.autoMovePending || !isMyTurn) return;
+    if (isMoving || isSixAction) {
+      const id = setTimeout(() => autoMove?.(), 800); // brief reveal of the rolled die
+      return () => clearTimeout(id);
+    }
+  }, [state.autoMovePending, isMoving, isSixAction, isMyTurn]);
 
   // Offline kick: when a player's skipCount reaches 2 in local (hot-seat) play,
   // remove them directly. Online play handles this via OnlineGameBoard's

@@ -77,6 +77,9 @@ function initState(setupPlayers) {
     // Server-committed seed for a verifiable dice roll (online play). null when
     // no roll is in flight; see useOnlineGame's two-phase roll + firestore.rules.
     rollSeed: null,
+    // Flags an auto-rolled (timed-out) turn so the client immediately makes one
+    // random move; cleared by a manual roll / the move / turn handoff.
+    autoMovePending: false,
     // Finish standings — colors in finish order. First entry = 1st place.
     // Replaces the old single `winner` field. Game-over fires when every
     // remaining (non-DNF) player has been appended.
@@ -370,6 +373,7 @@ function advanceTurn(state) {
     bonusRoll: false,
     phase: 'rolling',
     rollSeed: null, // clear any verifiable-roll seed on turn handoff
+    autoMovePending: false,
   };
 }
 
@@ -720,19 +724,41 @@ function applyDuelResolve(state, atkRoll, defRoll) {
   );
 }
 
+// Auto-play helper: make ONE uniformly-random legal move with the current
+// diceValue. No legal moves → advance (skip). A rolled 6 that would grant a
+// bonus re-roll is forfeited (turn ends). Duel/special-trigger results are left
+// as-is for the existing timeouts to resolve.
+function applyRandomMove(state) {
+  const moves = getValidMoves(state, state.diceValue);
+  if (!moves || moves.length === 0) return advanceTurn(state);
+  const move = moves[Math.floor(Math.random() * moves.length)];
+  const result = applyMove(state, move);
+  if (result.currentPlayerIndex === state.currentPlayerIndex && result.phase === 'rolling') {
+    return advanceTurn(result); // forfeit the 6-bonus
+  }
+  return result;
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'ROLL_DICE': {
-      // Rolling counts as an active turn — reset any pending skip-warning.
-      if (state.players[state.currentPlayerIndex]?.skipCount) {
+      if (action.auto) {
+        // Auto-roll for a timed-out turn: counts as a skip (does NOT reset).
+        state = { ...state, players: state.players.map((p, i) =>
+          i === state.currentPlayerIndex ? { ...p, skipCount: (p.skipCount ?? 0) + 1 } : p
+        ) };
+      } else if (state.players[state.currentPlayerIndex]?.skipCount) {
+        // Manual roll counts as activity — reset any pending skip-warning.
         state = { ...state, players: state.players.map((p, i) =>
           i === state.currentPlayerIndex ? { ...p, skipCount: 0 } : p
         ) };
       }
       // Consume the verifiable-roll seed (online supplies action.forcedValue
       // derived from it; offline rolls locally). Clearing it frees the lock so
-      // the next roll can commit a fresh seed.
-      state = { ...state, rollSeed: null };
+      // the next roll can commit a fresh seed. `autoMovePending` flags an
+      // auto-roll so the client immediately makes one random move (and a manual
+      // roll clears it, so we never auto-move a roll the player made).
+      state = { ...state, rollSeed: null, autoMovePending: !!action.auto };
       const val = action.forcedValue ?? rollD6();
       const player = state.players[state.currentPlayerIndex];
       const stuck = isAllStuck(player);
@@ -779,7 +805,44 @@ function reducer(state, action) {
 
     case 'SELECT_MOVE': {
       const move = action.move;
-      return applyMove(state, move);
+      // A manual move clears the auto-move flag so a pending auto-move timer no-ops.
+      return { ...applyMove(state, move), autoMovePending: false };
+    }
+
+    // Present-but-idle auto-play, move step (the auto-roll already bumped
+    // skipCount). Makes one random legal move; forfeits a 6-bonus. Guarded so a
+    // stale timer (e.g. the player returned and moved) is a no-op.
+    case 'AUTO_MOVE': {
+      if (!state.autoMovePending) return state;
+      return { ...applyRandomMove(state), autoMovePending: false };
+    }
+
+    // Recoverer (host/seat-0) plays an absent player's whole turn in one shot:
+    // ensure a roll, then one random move. Counts as a skip. `color` lets
+    // out-of-date clients no-op once another client already advanced the turn.
+    case 'HOST_AUTO_PLAY': {
+      const idx = state.currentPlayerIndex;
+      const current = state.players[idx];
+      if (!current || (action.color && current.color !== action.color)) return state;
+      if (state.phase === 'game-over' || state.phase === 'initial-roll') return state;
+
+      let s = state;
+      if (s.phase === 'rolling') {
+        // Derive the committed seed if the player left one (server-fixed, not
+        // host-chosen); otherwise the recoverer rolls locally.
+        const val = s.rollSeed && typeof s.rollSeed.toMillis === 'function'
+          ? (s.rollSeed.toMillis() % 6) + 1
+          : rollD6();
+        s = reducer(s, { type: 'ROLL_DICE', auto: true, forcedValue: val });
+      } else {
+        // Already rolled (moving/six-action/no-moves) — count this recovery as a skip.
+        s = { ...s, players: s.players.map((p, i) =>
+          i === idx ? { ...p, skipCount: (p.skipCount ?? 0) + 1 } : p) };
+      }
+      if (s.phase === 'moving' || s.phase === 'six-action' || s.phase === 'no-moves') {
+        return { ...applyRandomMove(s), autoMovePending: false };
+      }
+      return { ...s, autoMovePending: false }; // still rolling (stuck) — next tick handles it
     }
 
     case 'SKIP_PLACE_SPECIAL': {
@@ -903,7 +966,8 @@ function reducer(state, action) {
     case 'DUEL_SET_ROLL': {
       const { who, roll } = action;
       if (!state.duelState) return state;
-      return { ...state, duelState: { ...state.duelState, [who === 'atk' ? 'atkRoll' : 'defRoll']: roll } };
+      // Clear the verifiable-roll seed consumed by this roll (online); harmless offline.
+      return { ...state, rollSeed: null, duelState: { ...state.duelState, [who === 'atk' ? 'atkRoll' : 'defRoll']: roll } };
     }
 
     case 'FORCE_DUEL_TIMEOUT': {
@@ -1094,7 +1158,11 @@ function reducer(state, action) {
           i === rollerIdx ? { ...p, skipCount: 0 } : p
         ) };
       }
-      const val = rollD6();
+      // Consume the verifiable-roll seed (online supplies action.forcedValue
+      // derived from it; offline rolls locally). Cleared so the next roller can
+      // commit a fresh seed.
+      state = { ...state, rollSeed: null };
+      const val = action.forcedValue ?? rollD6();
       const newRolls = { ...initialRolls, [color]: val };
       const nextIdx = initialRollIdx + 1;
 
@@ -1137,7 +1205,8 @@ function reducer(state, action) {
 
     case 'KOCKA_SET_ROLL': {
       if (!state.specialTrigger || state.specialTrigger.type !== 'dice') return state;
-      return { ...state, specialTrigger: { ...state.specialTrigger, d1: action.d1, d2: action.d2 } };
+      // Clear the verifiable-roll seed consumed by this roll (online); harmless offline.
+      return { ...state, rollSeed: null, specialTrigger: { ...state.specialTrigger, d1: action.d1, d2: action.d2 } };
     }
 
     case 'SYNC':
@@ -1292,6 +1361,9 @@ export function useGame(setupPlayers) {
   const initialRoll = useCallback(() => dispatch({ type: 'INITIAL_ROLL' }), []);
   const continueAfterTie = useCallback(() => dispatch({ type: 'CONTINUE_AFTER_TIE' }), []);
   const startGame = useCallback(() => dispatch({ type: 'START_GAME' }), []);
+  // Auto-play a timed-out turn: roll (counts as skip) then make a random move.
+  const autoRoll = useCallback(() => dispatch({ type: 'ROLL_DICE', auto: true }), []);
+  const autoMove = useCallback(() => dispatch({ type: 'AUTO_MOVE' }), []);
 
   const validMoves = (state.phase === 'moving' || state.phase === 'six-action')
     ? getValidMoves(state, state.diceValue)
@@ -1326,5 +1398,7 @@ export function useGame(setupPlayers) {
     initialRoll,
     continueAfterTie,
     startGame,
+    autoRoll,
+    autoMove,
   };
 }

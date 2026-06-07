@@ -17,15 +17,27 @@ service cloud.firestore {
       function isHost()      { return existing().hostUid == uid(); }
       function isMember()    { return uid() in existing().playerUids; }
 
-      // A "recoverer" may drive cross-player recovery writes (stale-skip, kick).
-      // The host is the primary; seat 0 (players[0]) is the fallback so the game
-      // can still advance when the host itself disconnects. Both migrate as
-      // players leave, so authority is never permanently lost (except the rare
-      // case where host == seat 0 and that single player goes stale on its own
-      // turn — the room then needs a fresh game).
+      // The host's heartbeat (presence) is older than 60s, or the host is no
+      // longer in the room. Used to widen recovery authority so the game doesn't
+      // stall when the host (who is usually also seat 0) disconnects.
+      function hostStale() {
+        return !(existing().hostUid in existing().playerUids)
+          || ( 'presence' in existing()
+            && existing().hostUid in existing().presence
+            && existing().presence[existing().hostUid].toMillis() < request.time.toMillis() - 60000 );
+      }
+
+      // A "recoverer" may drive cross-player recovery writes (stale-skip, kick,
+      // host auto-play). The host is the primary; seat 0 (players[0]) is the
+      // fallback. If the host has disconnected (hostStale), ANY member may
+      // recover — otherwise, when host == seat 0, an absent host would freeze
+      // the room (nobody could even remove the stale host). Recovery writes stay
+      // tightly constrained (size-preserving board change / roster shrink), so
+      // widening the *writer* set here can't grant new powers.
       function isRecoverer() {
         return isHost()
-          || (existing().players.size() > 0 && uid() == existing().players[0].uid);
+          || (existing().players.size() > 0 && uid() == existing().players[0].uid)
+          || hostStale();
       }
 
       function createShapeOk() {
@@ -171,7 +183,8 @@ service cloud.firestore {
       }
       function recovererP(d) {
         return d.hostUid == uid()
-          || (d.players.size() > 0 && d.players[0].uid == uid());
+          || (d.players.size() > 0 && d.players[0].uid == uid())
+          || hostStale();
       }
 
       // Structural invariants every active-game gameState write must satisfy.
@@ -189,10 +202,9 @@ service cloud.firestore {
             && n.playerUids == d.playerUids );
       }
 
-      // Normal move by the current player (select/place/end-turn/attacker duel
-      // resolution/special resolution). A move may NOT mint a new diceValue — it
-      // can only keep the current one or clear it; new dice come only from the
-      // verifiable roll (rollDeriveP). It never carries a pending seed.
+      // Normal move by the current player (select/place/end-turn/duel & special
+      // resolution). A move may NOT mint a new diceValue — only keep or clear it;
+      // new dice values come only from a verified roll. Never carries a seed.
       function moveP(g, h) {
         return currentIsMeP(g)
           && h.phase != 'initial-roll'
@@ -200,54 +212,122 @@ service cloud.firestore {
           && h.get('rollSeed', null) == null;
       }
 
-      // Verifiable roll, phase 1: commit a server-stamped seed. The seed must
-      // equal request.time (client cannot choose it); no roll may be in flight;
-      // diceValue/turn/phase/standings untouched.
+      // Milliseconds of the committed seed (only call when rollSeed is present).
+      function seedMs(g) { return g.get('rollSeed', null).toMillis(); }
+
+      // Who may commit a roll seed now. rolling/six-action/moving: the current
+      // player. duel: the attacker before atkRoll, then the defender (defUid)
+      // between atkRoll and defRoll — serialized via the single seed slot.
+      // initial-roll: any member (roller is a color, unresolvable here; the value
+      // is still server-fixed and verified on derive).
+      function rollActorP(g) {
+        return g.phase == 'duel'
+          ? ( g.duelState != null && (
+                (currentIsMeP(g) && g.duelState.atkRoll == null)
+                || (g.duelState.defUid == uid()
+                    && g.duelState.atkRoll != null && g.duelState.defRoll == null) ) )
+          : ( g.phase == 'initial-roll' || currentIsMeP(g) );
+      }
+
+      // Verifiable roll, phase 1: commit a server-stamped seed. Must equal
+      // request.time (client can't choose it); no roll in flight; only the seed
+      // changes.
       function rollInitP(g, h) {
-        return currentIsMeP(g)
+        return rollActorP(g)
           && g.get('rollSeed', null) == null
           && h.get('rollSeed', null) == request.time
           && h.diceValue == g.diceValue
           && h.currentPlayerIndex == g.currentPlayerIndex
           && h.phase == g.phase
-          && h.standings == g.standings;
+          && h.standings == g.standings
+          && h.players == g.players;
       }
 
-      // Verifiable roll, phase 2: derive diceValue from the committed seed and
-      // clear it. The rule recomputes the value, so it cannot be forged, and the
-      // seed lock prevents re-rolling for a better one.
+      // Phase 2 — derive branches. Each: seed present in g, cleared in h, and the
+      // written value(s) equal the rule's own recomputation, so they can't be
+      // forged and the seed lock prevents re-rolling.
+
+      // Main turn roll → diceValue.
       function rollDeriveP(g, h) {
-        return currentIsMeP(g)
+        return currentIsMeP(g) && g.phase == 'rolling'
           && g.get('rollSeed', null) != null
           && h.get('rollSeed', null) == null
-          && h.diceValue == (g.get('rollSeed', null).toMillis() % 6) + 1;
+          && h.diceValue == (seedMs(g) % 6) + 1;
       }
 
-      // The duel defender (not the current player) writing only their roll.
-      function duelDefP(g, h) {
-        return g.phase == 'duel' && g.duelState != null
-          && g.duelState.defUid == uid()
+      // KOCKA ('dice' special) → specialTrigger.d1 / d2 (two dice from one seed).
+      function kockaDeriveP(g, h) {
+        return currentIsMeP(g)
+          && g.phase == 'special-trigger' && g.specialTrigger != null
+          && g.specialTrigger.type == 'dice'
+          && g.get('rollSeed', null) != null
+          && h.get('rollSeed', null) == null
+          && h.specialTrigger.d1 == (seedMs(g) % 6) + 1
+          && h.specialTrigger.d2 == ((seedMs(g) / 6) % 6) + 1
           && h.players == g.players
           && h.currentPlayerIndex == g.currentPlayerIndex
-          && h.phase == 'duel'
           && h.standings == g.standings;
       }
 
-      // Stale-skip of an absent active player by a recoverer (host/seat 0).
+      // Duel attacker roll → duelState.atkRoll (current player, before defender).
+      function duelAtkDeriveP(g, h) {
+        return currentIsMeP(g)
+          && g.phase == 'duel' && g.duelState != null && g.duelState.atkRoll == null
+          && g.get('rollSeed', null) != null
+          && h.get('rollSeed', null) == null
+          && h.duelState.atkRoll == (seedMs(g) % 6) + 1
+          && h.duelState.defRoll == g.duelState.defRoll
+          && h.players == g.players
+          && h.currentPlayerIndex == g.currentPlayerIndex
+          && h.phase == 'duel' && h.standings == g.standings;
+      }
+
+      // Duel defender roll → duelState.defRoll (defUid, after the attacker).
+      function duelDefDeriveP(g, h) {
+        return g.phase == 'duel' && g.duelState != null
+          && g.duelState.defUid == uid()
+          && g.duelState.atkRoll != null && g.duelState.defRoll == null
+          && g.get('rollSeed', null) != null
+          && h.get('rollSeed', null) == null
+          && h.duelState.defRoll == (seedMs(g) % 6) + 1
+          && h.duelState.atkRoll == g.duelState.atkRoll
+          && h.players == g.players
+          && h.currentPlayerIndex == g.currentPlayerIndex
+          && h.phase == 'duel' && h.standings == g.standings;
+      }
+
+      // Initial-roll value → initialRolls[roller]. Any member; value verified.
+      // (Winner/tie selection isn't enforceable in rules — documented residual.)
+      function initialDeriveP(g, h) {
+        return g.phase == 'initial-roll'
+          && g.initialRollOrder is list
+          && g.initialRollIdx is int && g.initialRollIdx >= 0
+          && g.initialRollIdx < g.initialRollOrder.size()
+          && g.get('rollSeed', null) != null
+          && h.get('rollSeed', null) == null
+          && h.initialRolls.get(g.initialRollOrder[g.initialRollIdx], -1) == (seedMs(g) % 6) + 1
+          && h.players.size() == g.players.size();
+      }
+
+      // Recoverer (host/seat 0) handling an absent active player: a bare skip, or
+      // an auto-played turn (HOST_AUTO_PLAY: roll + one random move). Roster size
+      // is pinned; standings may only grow (a recovery move can finish a piece).
       function staleSkipP(d, g, h) {
         return recovererP(d)
           && g.phase != 'initial-roll' && g.phase != 'game-over'
           && h.players.size() == g.players.size()
-          && h.standings == g.standings;
+          && h.standings.size() >= g.standings.size();
       }
 
-      // Pre-game initial-roll. Actor is identified by color (unresolvable in
-      // rules) so any member may roll; only the host flips phase to 'rolling'.
+      // Pre-game initial-roll BOOKKEEPING only (the roll itself goes via
+      // rollInitP + initialDeriveP): host flips to 'rolling' (START_GAME) or
+      // resets for a tie re-roll (initialRolls must not grow).
       function initialRollP(d, g, h) {
-        return g.phase == 'initial-roll'
-          && (h.phase == 'initial-roll'
-              || (h.phase == 'rolling' && d.hostUid == uid()))
-          && h.players.size() == g.players.size();
+        return g.phase == 'initial-roll' && d.hostUid == uid()
+          && h.players.size() == g.players.size()
+          && ( h.phase == 'rolling'
+            || (h.phase == 'initial-roll'
+                && h.initialRolls.size() <= g.initialRolls.size()) );
       }
 
       // Recoverer drives the board into game-over (e.g. everyone removed).
@@ -262,10 +342,15 @@ service cloud.firestore {
           && g != null && h != null
           && (uid() in d.playerUids)
           && structOkP(d, n, g, h)
-          && ( moveP(g, h)
-            || rollInitP(g, h)
-            || rollDeriveP(g, h)
-            || duelDefP(g, h)
+          // Branch on whether a roll seed is in flight so a write only evaluates
+          // the relevant half (keeps each write under the 1000-expression limit).
+          && ( ( g.get('rollSeed', null) == null
+                 ? ( moveP(g, h) || rollInitP(g, h) )
+                 : ( rollDeriveP(g, h)
+                     || kockaDeriveP(g, h)
+                     || duelAtkDeriveP(g, h)
+                     || duelDefDeriveP(g, h)
+                     || initialDeriveP(g, h) ) )
             || staleSkipP(d, g, h)
             || initialRollP(d, g, h)
             || gameOverP(d, g, h) );

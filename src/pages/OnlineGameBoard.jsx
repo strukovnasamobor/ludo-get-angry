@@ -73,11 +73,22 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
 
   const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState, myUid, room.hostUid);
 
-  // Only the host (primary) or seat 0 (fallback when the host disconnects) may
-  // drive recovery writes — stale-skip and kick. This keeps the authorized
-  // writer deterministic so the Firestore rules can pin it; both roles migrate
-  // as players leave. Mirrors isRecoverer() in firestore.rules.
-  const canManage = myUid === room.hostUid || myUid === room.players[0]?.uid;
+  // The recoverer drives cross-player recovery writes (stale-skip, auto-play,
+  // kick). It's the FIRST currently-present player in seat order — normally the
+  // host (seat 0), but if the host has disconnected, authority falls to the next
+  // present player so the room never freezes waiting for an absent host. A
+  // player with no presence entry yet (just connected) counts as present. This
+  // mirrors isRecoverer()/hostStale() in firestore.rules, which authorizes any
+  // member once the host's heartbeat is stale.
+  const recovererUid = (() => {
+    const now = Date.now();
+    const present = room.players.find(p => {
+      const last = room.presence?.[p.uid]?.toMillis?.();
+      return last == null || now - last < ACTIVE_STALE_MS;
+    });
+    return (present ?? room.players[0])?.uid;
+  })();
+  const canManage = !!myUid && myUid === recovererUid;
 
   // Remove a player by writing the shrunk room roster AND the recomputed
   // gameState in a SINGLE updateDoc, so the two never diverge (the rules'
@@ -131,7 +142,7 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     if (stalePlayer) removePlayer(stalePlayer.uid, stalePlayer.color);
   }, [room.presence, gameHook.state.players, gameHook.state.phase, canManage, myUid, removePlayer]);
 
-  // ── Active-player stale detection: skip them after ACTIVE_STALE_MS;
+  // ── Active-player stale detection: auto-play their turn after ACTIVE_STALE_MS;
   //    kick them on a 2nd consecutive skip. ──
   useEffect(() => {
     if (!canManage) return;
@@ -147,7 +158,8 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     if ((active.skipCount ?? 0) >= 1) {
       removePlayer(active.uid, active.color);   // second consecutive skip — kick
     } else {
-      gameHook.skipPlayerTurn(active.color);    // persisted by the recoverer via useOnlineGame
+      // Roll + one random move on the absent player's behalf (counts as a skip).
+      gameHook.hostAutoPlay(active.color);      // persisted by the recoverer via useOnlineGame
     }
   }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players, canManage, myUid, removePlayer]);
 

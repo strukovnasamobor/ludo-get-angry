@@ -3,3 +3,4 @@ Ver. 1.0.2 (4)
 
 UPGRADES
 - true legal-move validation with Cloudflare Workers
+- ranked games

@@ -55,9 +55,25 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     const onPageHide = () => writePresence();
     window.addEventListener('pagehide', onPageHide);
 
+    // CRITICAL for iOS: Safari/WebViews fully suspend JS (and the heartbeat
+    // interval) while backgrounded — lock screen, a notification, app-switch.
+    // On a brief background the player's heartbeat goes stale and the auto-play/
+    // stale-detector can play their turn for them, so on return it's no longer
+    // their turn ("iOS won't let me move"). Re-send the heartbeat the moment the
+    // app becomes visible/focused again so a quick background never marks them
+    // stale. (Won't save a background longer than ACTIVE_STALE_MS — that player
+    // is genuinely away.)
+    const onResume = () => { if (document.visibilityState === 'visible') writePresence(); };
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('pageshow', onResume);
+    window.addEventListener('focus', onResume);
+
     return () => {
       clearInterval(id);
       window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('pageshow', onResume);
+      window.removeEventListener('focus', onResume);
     };
   }, []);
 

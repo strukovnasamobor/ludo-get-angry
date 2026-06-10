@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager
+  memoryLocalCache,
 } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
@@ -27,8 +26,12 @@ initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true
 });
 
+// memoryLocalCache: keep everything in RAM. No localStorage mutation queue
+// (which fills up under heavy write pressure or many denied retries), no
+// IndexedDB document cache. Right tradeoff for a live multiplayer game
+// where players are always online; closing the tab means starting fresh.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  localCache: memoryLocalCache(),
 });
 
 export const auth = getAuth(app);

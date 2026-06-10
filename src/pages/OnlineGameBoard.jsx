@@ -87,15 +87,13 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     uid: p.uid,
   }));
 
-  const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState, myUid, room.hostUid);
-
-  // The recoverer drives cross-player recovery writes (stale-skip, auto-play,
-  // kick). It's the FIRST currently-present player in seat order — normally the
-  // host (seat 0), but if the host has disconnected, authority falls to the next
-  // present player so the room never freezes waiting for an absent host. A
-  // player with no presence entry yet (just connected) counts as present. This
-  // mirrors isRecoverer()/hostStale() in firestore.rules, which authorizes any
-  // member once the host's heartbeat is stale.
+  // The recoverer drives cross-player recovery writes (stale-skip, kick). It's
+  // the FIRST currently-present player in seat order — normally the host (seat 0),
+  // but if the host has disconnected, authority falls to the next present player
+  // so the room never freezes waiting for an absent host. A player with no
+  // presence entry yet (just connected) counts as present. This mirrors
+  // recovererP()/hostStale() in firestore.rules. Computed before the hook so it
+  // can be passed in — the persist guard authorizes a recoverer's stale-skip.
   const recovererUid = (() => {
     const now = Date.now();
     const present = room.players.find(p => {
@@ -105,6 +103,8 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     return (present ?? room.players[0])?.uid;
   })();
   const canManage = !!myUid && myUid === recovererUid;
+
+  const gameHook = useOnlineGame(setupPlayers, roomId, room.players, room.gameState, myUid, room.hostUid, canManage);
 
   // Remove a player by writing the shrunk room roster AND the recomputed
   // gameState in a SINGLE updateDoc, so the two never diverge (the rules'
@@ -174,8 +174,10 @@ function OnlineGameBoardInner({ room, roomId, myUid }) {
     if ((active.skipCount ?? 0) >= 1) {
       removePlayer(active.uid, active.color);   // second consecutive skip — kick
     } else {
-      // Roll + one random move on the absent player's behalf (counts as a skip).
-      gameHook.hostAutoPlay(active.color);      // persisted by the recoverer via useOnlineGame
+      // Just skip the absent player's turn (no auto-roll/move): counts as a skip.
+      // Dispatched (not a direct write) so it updates THIS recoverer's own state
+      // immediately and persists via the guard (which now authorizes a recoverer).
+      gameHook.skipPlayerTurn(active.color);
     }
   }, [room.presence, gameHook.state.currentPlayerIndex, gameHook.state.phase, gameHook.state.players, canManage, myUid, removePlayer]);
 

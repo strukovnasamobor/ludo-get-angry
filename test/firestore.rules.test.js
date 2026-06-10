@@ -337,6 +337,35 @@ describe('stale-skip (recoverer only)', () => {
     next.standings = ['blue'];
     await assertSucceeds(updateDoc(ref(db('H')), { gameState: next }));
   });
+
+  it('the host may NOT forge their OWN diceValue via the recovery path', async () => {
+    // Host H is the current player. The recovery transition (staleSkipP) must not
+    // let a recoverer overwrite the dice on their own turn — that would bypass
+    // verifiable dice. Changing the dice on your own turn must go through the roll.
+    await seed(room({ gameState: gameState({ currentPlayerIndex: 0, diceValue: 3, phase: 'moving' }) }));
+    await assertFails(updateDoc(ref(db('H')), { 'gameState.diceValue': 6 }));
+  });
+
+  it('a recoverer may NOT forge dice on their own turn even when host is stale', async () => {
+    // O is the current player AND a recoverer (host stale). Still may not forge
+    // their own roll — recovery is only for OTHER players' turns.
+    await seed(room({
+      gameState: gameState({ currentPlayerIndex: 2, diceValue: 3, phase: 'moving' }),
+      presence: { H: Timestamp.fromMillis(1000) },
+    }));
+    await assertFails(updateDoc(ref(db('O')), { 'gameState.diceValue': 6 }));
+  });
+
+  it('a recoverer may NOT mint a dice for an absent player (recovery never rolls)', async () => {
+    // Host H is current (idx 0) and absent; O recovers (host stale). The
+    // recovery path must not let O choose a dice — it can only move with an
+    // already-rolled value or forfeit.
+    await seed(room({
+      gameState: gameState({ currentPlayerIndex: 0, diceValue: null, phase: 'rolling' }),
+      presence: { H: Timestamp.fromMillis(1000) },
+    }));
+    await assertFails(updateDoc(ref(db('O')), { 'gameState.diceValue': 6 }));
+  });
 });
 
 describe('initial-roll phase', () => {

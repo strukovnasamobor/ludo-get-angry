@@ -153,6 +153,7 @@ function BridgeOverlay({ bridgesOnBoard }) {
       const ring = parts[0];
       const idx = Number(parts[1]);
       const path = ring === 'outer' ? OUTER_PATH : INNER_PATH;
+      if (!path[idx]) return []; // stray/malformed bridge key — skip
       const { r: r1, c: c1 } = path[idx];
       const dest = getBridgeParallel(ring, idx);
       if (!dest) return [];

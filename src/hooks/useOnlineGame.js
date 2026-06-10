@@ -3,7 +3,7 @@ import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase';
 import { reducer, initState, getValidMoves, getPlacementMoves } from './useGame';
 
-export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameState, myUid, hostUid) {
+export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameState, myUid, hostUid, canManage = false) {
   // Lazy-init from the remote gameState when it already exists (rejoin into
   // a game in progress). Falls back to a fresh initial-roll state for brand-new
   // rooms where nothing has been written yet.
@@ -97,9 +97,13 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
     } else if (state.phase === 'initial-roll' || wasInitialRoll) {
       canPersist = true;                        // any member rolls / host starts
     } else {
+      // `canManage` = this client is the active recoverer (host/seat 0, or any
+      // present member once the host is stale). It lets a recoverer persist a
+      // dispatched stale-skip even when it's not their own turn — the rules
+      // (staleSkipP) are the backstop for what they may actually write.
       canPersist = isCurrent || wasCurrent
         || isDuelDefender || wasDuelDefender
-        || isHostUser || isSeat0;
+        || isHostUser || isSeat0 || canManage;
     }
     // If myUid is unknown (shouldn't happen online) fall back to permissive so
     // we never brick a session; the rules remain the backstop.
@@ -113,7 +117,7 @@ export function useOnlineGame(setupPlayers, roomId, roomPlayers, initialGameStat
       console.error('Firestore write failed:', err);
       lastRemoteStateRef.current = null;
     });
-  }, [state, roomId, myUid, hostUid, seat0Uid]);
+  }, [state, roomId, myUid, hostUid, seat0Uid, canManage]);
 
   // Verifiable roll, phase 1 (init): commit a server-stamped seed. We do NOT
   // dispatch the roll here — the derive effect below resolves it once the seed

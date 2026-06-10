@@ -38,7 +38,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   const { state, currentPlayer: rawCurrentPlayer, validMoves, placementMoves, rollDice, selectMove,
     skipPlaceSpecial, placeSpecial, resolveDuel, duelSetRoll, forceDuelTimeout, resolveMost, resolveKocka, kockaSetRoll, resolveZamjena,
     dismissSpecialInfo, endTurn, skipPlayerTurn, removePlayer, initialRoll, continueAfterTie, startGame,
-    autoRoll, autoMove,
   } = gameHook ?? localHook;
 
   // When everyone has been removed (e.g. two consecutive timeouts kicked
@@ -163,20 +162,9 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
   autoAdvanceRef.current = () => {
     if (!isMyTurn) return;
     if (phase === 'rolling') {
-      // If this would be their 2nd consecutive missed roll (skipCount already 1),
-      // kick directly instead of going skipCount=1→2 and waiting for the kick
-      // effect. Belt-and-suspenders for the lone-survivor case where the kick
-      // effect chain might lag.
-      const me = state.players[state.currentPlayerIndex];
-      if (me && (me.skipCount ?? 0) >= 1 && removePlayer) {
-        removePlayer(me.color);
-      } else if (!state.rollSeed) {
-        // Auto-play the turn instead of bare-skipping: roll now (counts as a
-        // skip). The roll sets state.autoMovePending, and the follow-up effect
-        // below makes one random move immediately. Skip if a roll is already in
-        // flight (the player just clicked) — that derive will resolve normally.
-        autoRoll?.();
-      }
+      // Idle at the roll → just skip the turn (no auto-roll). Counts as a skip;
+      // after the 2nd consecutive skip the skipCount>=2 watcher removes them.
+      skipPlayerTurn?.(currentPlayer.color);
     }
     else if (phase === 'moving') {
       if (validMoves.length > 0) {
@@ -244,18 +232,6 @@ export default function GameBoard({ gameHook = null, isMyTurn = true, myPlayerCo
     const timer = setTimeout(endTurn, 1500);
     return () => clearTimeout(timer);
   }, [isNoMoves, endTurn]);
-
-  // After an auto-rolled (timed-out) turn, immediately make one random move so
-  // the turn is played rather than skipped. `state.autoMovePending` is set by
-  // the auto-roll and cleared by the move / a manual roll, so this never fires
-  // for a roll the player made. (no-moves is handled by the effect above.)
-  useEffect(() => {
-    if (!state.autoMovePending || !isMyTurn) return;
-    if (isMoving || isSixAction) {
-      const id = setTimeout(() => autoMove?.(), 800); // brief reveal of the rolled die
-      return () => clearTimeout(id);
-    }
-  }, [state.autoMovePending, isMoving, isSixAction, isMyTurn]);
 
   // Offline kick: when a player's skipCount reaches 2 in local (hot-seat) play,
   // remove them directly. Online play handles this via OnlineGameBoard's

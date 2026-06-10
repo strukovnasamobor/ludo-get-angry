@@ -205,7 +205,11 @@ function isHomeCell(r, c) {
 //   Outer: top idx=c, right idx=18+r, bottom idx=54-c, left idx=72-r
 //   Inner: top idx=c-3, right idx=9+r, bottom idx=39-c, left idx=51-r
 export function getBridgeParallel(ring, idx) {
-  const { r, c } = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
+  // Guard against an out-of-range / malformed idx (e.g. a stray bridge key or a
+  // position past the ring end): no path cell → no parallel.
+  const pathCell = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
+  if (!pathCell) return null;
+  const { r, c } = pathCell;
 
   if (ring === 'outer') {
     // Four corner-adjacent bridges (the "second possibility" at each inner
@@ -275,7 +279,9 @@ export function canPlaceMost(ring, idx, bridgesOnBoard) {
 // `allowExit` lets BRIDGE bypass the EXIT-cell guard (Rule 9.2 new — BRIDGE
 // can be placed on an EXIT cell, other specials cannot).
 export function canPlaceSpecial(ring, idx, activeColors, allowExit = false) {
-  const { r, c } = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
+  const pathCell = ring === 'outer' ? OUTER_PATH[idx] : INNER_PATH[idx];
+  if (!pathCell) return false;
+  const { r, c } = pathCell;
   const cell = GRID[r][c];
   if (cell.type !== 'outer-path' && cell.type !== 'inner-path') return false;
   if (allowExit) return true;

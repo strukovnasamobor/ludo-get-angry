@@ -817,32 +817,29 @@ function reducer(state, action) {
       return { ...applyRandomMove(state), autoMovePending: false };
     }
 
-    // Recoverer (host/seat-0) plays an absent player's whole turn in one shot:
-    // ensure a roll, then one random move. Counts as a skip. `color` lets
-    // out-of-date clients no-op once another client already advanced the turn.
+    // Recoverer (host/seat-0/present player) handles an ABSENT player's turn.
+    // Counts as a skip. The recoverer NEVER rolls — a recovery roll would let
+    // them choose the dice, bypassing verifiable dice. So:
+    //   - already rolled (a verified diceValue exists) → play one random move
+    //     with that real dice;
+    //   - not yet rolled → forfeit the turn (advance). Present-but-idle players
+    //     still get a seed-verified auto-roll from their OWN client.
+    // `color` lets out-of-date clients no-op once another already advanced.
     case 'HOST_AUTO_PLAY': {
       const idx = state.currentPlayerIndex;
       const current = state.players[idx];
       if (!current || (action.color && current.color !== action.color)) return state;
       if (state.phase === 'game-over' || state.phase === 'initial-roll') return state;
 
-      let s = state;
-      if (s.phase === 'rolling') {
-        // Derive the committed seed if the player left one (server-fixed, not
-        // host-chosen); otherwise the recoverer rolls locally.
-        const val = s.rollSeed && typeof s.rollSeed.toMillis === 'function'
-          ? (s.rollSeed.toMillis() % 6) + 1
-          : rollD6();
-        s = reducer(s, { type: 'ROLL_DICE', auto: true, forcedValue: val });
-      } else {
-        // Already rolled (moving/six-action/no-moves) — count this recovery as a skip.
-        s = { ...s, players: s.players.map((p, i) =>
-          i === idx ? { ...p, skipCount: (p.skipCount ?? 0) + 1 } : p) };
-      }
+      // Count this recovery as a skip (toward the 2-strike kick).
+      const s = { ...state, autoMovePending: false, players: state.players.map((p, i) =>
+        i === idx ? { ...p, skipCount: (p.skipCount ?? 0) + 1 } : p) };
+
       if (s.phase === 'moving' || s.phase === 'six-action' || s.phase === 'no-moves') {
-        return { ...applyRandomMove(s), autoMovePending: false };
+        return applyRandomMove(s); // move with the already-rolled (verified) dice
       }
-      return { ...s, autoMovePending: false }; // still rolling (stuck) — next tick handles it
+      // 'rolling' (not rolled) / 'duel' / 'special-trigger' → forfeit the turn.
+      return advanceTurn({ ...s, duelState: null, specialTrigger: null });
     }
 
     case 'SKIP_PLACE_SPECIAL': {

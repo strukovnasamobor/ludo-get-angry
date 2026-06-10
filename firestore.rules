@@ -27,16 +27,17 @@ service cloud.firestore {
             && existing().presence[existing().hostUid].toMillis() < request.time.toMillis() - 60000 );
       }
 
-      // A "recoverer" may drive cross-player recovery writes (stale-skip, kick,
-      // host auto-play). The host is the primary; seat 0 (players[0]) is the
-      // fallback. If the host has disconnected (hostStale), ANY member may
-      // recover — otherwise, when host == seat 0, an absent host would freeze
-      // the room (nobody could even remove the stale host). Recovery writes stay
-      // tightly constrained (size-preserving board change / roster shrink), so
-      // widening the *writer* set here can't grant new powers.
-      function isRecoverer() {
-        return isHost()
-          || (existing().players.size() > 0 && uid() == existing().players[0].uid)
+      // A "recoverer" may drive cross-player recovery writes (stale-skip, kick).
+      // The host is primary; seat 0 (players[0]) is the fallback. If the host has
+      // disconnected (hostStale), ANY member may recover — otherwise, when host
+      // == seat 0, an absent host would freeze the room (nobody could even remove
+      // the stale host). Recovery writes stay tightly constrained (size-preserving,
+      // never minting a dice, or roster shrink), so widening the *writer* set
+      // can't grant new powers. `d` is the existing room doc — pass existing() at
+      // non-parameterized call sites.
+      function recovererP(d) {
+        return d.hostUid == uid()
+          || (d.players.size() > 0 && d.players[0].uid == uid())
           || hostStale();
       }
 
@@ -155,7 +156,7 @@ service cloud.firestore {
       // in a SINGLE write so the two stay consistent (isLeaveOrRemoval forbids
       // gameState changes, so it cannot cover this case).
       function isRemovalCascade() {
-        return isRecoverer()
+        return recovererP(existing())
           && incoming().players.size() < existing().players.size()
           && incoming().playerUids.size() < existing().playerUids.size()
           && incoming().status == existing().status
@@ -181,16 +182,12 @@ service cloud.firestore {
       function currentIsMeP(g) {
         return curIdxOkP(g) && g.players[g.currentPlayerIndex].uid == uid();
       }
-      function recovererP(d) {
-        return d.hostUid == uid()
-          || (d.players.size() > 0 && d.players[0].uid == uid())
-          || hostStale();
-      }
 
       // Structural invariants every active-game gameState write must satisfy.
       function structOkP(d, n, g, h) {
         return h.phase == 'game-over'
-          ? h.players.size() <= g.players.size()
+          ? ( h.players.size() <= g.players.size()
+              && n.players == d.players && n.playerUids == d.playerUids )
           : ( curIdxOkP(g)
             && h.currentPlayerIndex is int
             && h.currentPlayerIndex >= 0
@@ -309,14 +306,25 @@ service cloud.firestore {
           && h.players.size() == g.players.size();
       }
 
-      // Recoverer (host/seat 0) handling an absent active player: a bare skip, or
-      // an auto-played turn (HOST_AUTO_PLAY: roll + one random move). Roster size
-      // is pinned; standings may only grow (a recovery move can finish a piece).
+      // Recoverer handling an ABSENT active player: a bare skip, or one random
+      // move played with the absent player's ALREADY-rolled (verified) dice.
+      // The recoverer never rolls, so it can't choose a dice. Roster size is
+      // pinned; standings may only grow (a recovery move can finish a piece).
+      // CRITICAL: the recoverer must NOT be the current player — recovery is for
+      // an absent OTHER player. Otherwise a recoverer (host/seat 0) could use
+      // this broad transition to forge their own roll on their own turn; on their
+      // own turn they must use the normal roll/move flow (rollInitP/rollDeriveP/moveP).
       function staleSkipP(d, g, h) {
         return recovererP(d)
+          && !currentIsMeP(g)
           && g.phase != 'initial-roll' && g.phase != 'game-over'
           && h.players.size() == g.players.size()
-          && h.standings.size() >= g.standings.size();
+          && h.standings.size() >= g.standings.size()
+          // A recovery write may NOT mint a dice value — it can only keep the
+          // absent player's already-rolled (verified) value or clear it. New
+          // dice come only from a seed-verified roll, so a recoverer can never
+          // choose the dice for anyone.
+          && (h.diceValue == g.diceValue || h.diceValue == null);
       }
 
       // Pre-game initial-roll BOOKKEEPING only (the roll itself goes via
@@ -330,9 +338,11 @@ service cloud.firestore {
                 && h.initialRolls.size() <= g.initialRolls.size()) );
       }
 
-      // Recoverer drives the board into game-over (e.g. everyone removed).
+      // Recoverer (not the current player) drives the board into game-over (e.g.
+      // a recovery skip when all others have finished). The current player ends
+      // the game through a normal finishing move (moveP), not this path.
       function gameOverP(d, g, h) {
-        return recovererP(d) && h.phase == 'game-over'
+        return recovererP(d) && !currentIsMeP(g) && h.phase == 'game-over'
           && h.players.size() <= g.players.size();
       }
 

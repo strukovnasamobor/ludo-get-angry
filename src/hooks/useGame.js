@@ -392,6 +392,14 @@ function applyMove(state, move) {
     const spKey = `${move.ring}-${move.idx}`;
     const special = state.specialsOnBoard[spKey];
     if (!special) return state;
+    // You can only pick up a special if your piece is STILL on that cell. The
+    // move was generated when the piece was here, but it may be applied later
+    // (online SYNC, a bridge teleport, or a stale pickup-choice modal) once the
+    // piece has moved off — without this guard the special would be stripped
+    // from a cell no piece of yours is on.
+    const stationary = state.players[state.currentPlayerIndex].figures.find(f => f.id === move.figId);
+    if (!stationary || typeof stationary.pos !== 'object'
+        || stationary.pos.ring !== move.ring || stationary.pos.idx !== move.idx) return state;
     let newPlayers = deepCopyPlayers(state.players);
     const mover = newPlayers.find(p => p.color === player.color);
     const fig = mover.figures.find(f => f.id === move.figId);
@@ -431,6 +439,11 @@ function applyMove(state, move) {
     const aIdx = move.anchorIdx != null ? move.anchorIdx : move.idx;
     const anchorKey = `${aRing}-${aIdx}`;
     if (!state.bridgesOnBoard[anchorKey]) return state;
+    // Same guard as `pickup`: the piece must still be on its recorded bridge
+    // endpoint (move.ring/idx); reject a stale move where it has moved off.
+    const stationary = state.players[state.currentPlayerIndex].figures.find(f => f.id === move.figId);
+    if (!stationary || typeof stationary.pos !== 'object'
+        || stationary.pos.ring !== move.ring || stationary.pos.idx !== move.idx) return state;
     let newPlayers = deepCopyPlayers(state.players);
     let newSpecials = { ...state.specialsOnBoard };
     const mover = newPlayers.find(p => p.color === player.color);
@@ -709,7 +722,15 @@ function applyDuelResolve(state, atkRoll, defRoll) {
   loserFig.bombActive = null;
   const attackerWon = atkRoll > defRoll;
   const newState = { ...state, players: newPlayers, duelState: null };
-  if (!attackerWon) return advanceTurn(newState);
+  if (!attackerWon) {
+    // A 6-roll exit/move that triggered this duel still grants the bonus re-roll
+    // even when the attacker loses (their piece already went home above).
+    // `bonusRoll` is true only for a 6; advanceTurn/afterMove clear it otherwise.
+    if (state.bonusRoll) {
+      return { ...newState, phase: 'rolling', diceValue: null, bonusRoll: false, rollsLeft: 1 };
+    }
+    return advanceTurn(newState);
+  }
   // Attacker stays on the cell — resolve any special/bridge stack via the
   // unified precedence. Inherit duelState.skipBridge so a duel born from a
   // Cross teleport doesn't re-offer the just-crossed bridge.

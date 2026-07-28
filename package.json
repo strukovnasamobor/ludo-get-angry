@@ -1,16 +1,28 @@
 {
   "name": "ludo-get-angry",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "start": "vite --port 3000 --host",
+    "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "firebase:login": "firebase login",
-    "test:rules": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\"",
-    "deploy": "npm run build && firebase deploy --only hosting"
+    "test": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test test/firestore.rules.test.js\""
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
   "dependencies": {
     "@capacitor-firebase/app-check": "^8.2.0",

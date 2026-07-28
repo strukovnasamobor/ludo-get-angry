@@ -7,7 +7,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-512-maskable.png', 'i18n/en.json', 'i18n/hr.json'],
+      injectRegister: "auto",
+      includeAssets: [
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/icon-512-maskable.png",
+        "i18n/en.json",
+        "i18n/hr.json",
+      ],
       workbox: {
         // Don't hijack Firebase Auth's reserved paths with the SPA fallback —
         // the popup needs the real /__/auth/handler served by Firebase Hosting.
@@ -22,6 +29,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
+        scope: "/",
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -38,5 +46,9 @@ export default defineConfig({
         drop_debugger: true,  // Set to true in production
       },
     },
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
   },
 })

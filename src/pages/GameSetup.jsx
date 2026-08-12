@@ -12,28 +12,51 @@ const COLOR_HEX = {
   cyan: '#00838f', purple: '#8e24aa', magenta: '#f06292', orange: '#fb8c00',
 };
 
-function initPlayers(count, label) {
-  return ALL_COLORS.slice(0, count).map((color, i) => ({
-    id: i,
-    name: `${label} ${i + 1}`,
-    color,
-  }));
+const MAX_NAME_LEN = 14;
+
+// Build `count` players, keeping the name+color of any player that survives the
+// new count and filling the rest with the first still-unused colors.
+function initPlayers(count, label, prev = []) {
+  const kept = prev.slice(0, count);
+  const used = new Set(kept.map(p => p.color));
+  const free = ALL_COLORS.filter(c => !used.has(c));
+  let f = 0;
+  return Array.from({ length: count }, (_, i) => kept[i]
+    ? { ...kept[i], id: i }
+    : { id: i, name: `${label} ${i + 1}`, color: free[f++] });
+}
+
+// After a finished offline game, "Play again" lands back here — pre-fill the
+// names and colors the players just used. Returns null on anything unusable so
+// we fall back to the defaults.
+function loadPreviousPlayers() {
+  try {
+    const raw = sessionStorage.getItem('gameSetup');
+    if (!raw) return null;
+    const saved = JSON.parse(raw)?.players;
+    if (!Array.isArray(saved) || saved.length < 2 || saved.length > ALL_COLORS.length) return null;
+    const seen = new Set();
+    const players = saved.map((p, i) => {
+      if (typeof p?.name !== 'string' || !ALL_COLORS.includes(p?.color) || seen.has(p.color)) return null;
+      seen.add(p.color);
+      return { id: i, name: p.name.slice(0, MAX_NAME_LEN), color: p.color };
+    });
+    return players.every(Boolean) ? players : null;
+  } catch { return null; }
 }
 
 export default function GameSetup() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const [count, setCount] = useState(4);
-  const [players, setPlayers] = useState(() => initPlayers(4, t('setupPlayerName')));
+  const [initialPlayers] = useState(() => loadPreviousPlayers() ?? initPlayers(4, t('setupPlayerName')));
+  const [count, setCount] = useState(initialPlayers.length);
+  const [players, setPlayers] = useState(initialPlayers);
 
   function handleCountChange(n) {
     setCount(n);
-    setPlayers(prev => {
-      const next = initPlayers(n, t('setupPlayerName'));
-      // keep custom names if player existed
-      return next.map((p, i) => prev[i] ? { ...p, name: prev[i].name } : p);
-    });
+    // keep custom names and colors of the players that remain
+    setPlayers(prev => initPlayers(n, t('setupPlayerName'), prev));
   }
 
   function handleName(id, name) {
@@ -94,7 +117,7 @@ export default function GameSetup() {
                 <input
                   className="player-name-input"
                   value={player.name}
-                  maxLength={14}
+                  maxLength={MAX_NAME_LEN}
                   onChange={e => handleName(player.id, e.target.value)}
                 />
               </div>

@@ -12,6 +12,7 @@ export default defineConfig({
         "icons/icon-192.png",
         "icons/icon-512.png",
         "icons/icon-512-maskable.png",
+        "icons/icon-512-transparent.png",
         "i18n/en.json",
         "i18n/hr.json",
       ],

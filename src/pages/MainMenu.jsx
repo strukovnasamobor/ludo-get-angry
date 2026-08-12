@@ -23,7 +23,7 @@ export default function MainMenu() {
 
       <div className="menu-hero">
         <div className="menu-logo">
-          <div className="menu-logo-icon">🎲</div>
+          <img className="menu-logo-icon" src="/icons/icon-512-transparent.png" alt="" width="512" height="512" />
           <h1 className="menu-title">{t('appName')}</h1>
         </div>
       </div>

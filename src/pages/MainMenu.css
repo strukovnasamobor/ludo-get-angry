@@ -48,7 +48,8 @@
 }
 
 .menu-logo-icon {
-  font-size: 5rem;
+  width: clamp(6rem, 28vw, 9rem);
+  height: auto;
   filter: drop-shadow(0 0 16px rgba(200, 150, 255, 0.65));
 }
 
